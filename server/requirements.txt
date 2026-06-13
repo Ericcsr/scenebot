@@ -15,8 +15,9 @@
 # but is NOT pinned in its upstream requirements.txt, so the install command
 # above is required.
 
-# WebSocket bridge
+# WebSocket bridge + HTTP spawn server
 websockets>=12.0
+aiohttp>=3.9.0
 
 # imported by run_motion_graph.py (via pynput.keyboard) and as a direct dep
 # of run_motion_graph for the live-keyboard path; the listener is wrapped in
