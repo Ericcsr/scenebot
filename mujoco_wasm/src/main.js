@@ -560,14 +560,30 @@ export class MuJoCoDemo {
     this._policyDt = assets.policyMeta.control_dt; // 0.02 s = 50 Hz
     this._simDt = assets.policyMeta.simulation_dt; // 0.005 s = 200 Hz
     this._stepsPerControl = Math.max(1, Math.round(this._policyDt / this._simDt));
+    // Crucially align mj_step's integrator dt with the Python config. mujoco_env.py
+    // line 357 sets `model.opt.timestep = config.simulation_dt` (0.005). The scene
+    // XML doesn't carry a <option timestep=...>, so without this line we'd inherit
+    // MuJoCo's 0.002 default and the browser robot would run in slower sim-time.
+    this.model.opt.timestep = this._simDt;
     this._kp = Float32Array.from(assets.policyMeta.joint_stiffness);
     this._kd = Float32Array.from(assets.policyMeta.joint_damping);
     this._torqueLimit = Float32Array.from(assets.policyMeta.torque_limit);
     this._yawRateRadPerS = (60 * Math.PI) / 180; // mirrors --yaw-adjust-deg-per-s default
 
-    // Initialize sim qpos[0:36] to a sensible standing pose: pull from MotionGraphRuntime's
-    // initial pose so the first frame doesn't fall through the floor.
-    {
+    // Initialize sim qpos[0:36] from policyMeta.init_qpos_36 (frame 0 of the ref
+    // motion, baked offline by build_browser_assets.py to match Python's
+    // mujoco_env.py:213-219). This puts the robot at the same world location and
+    // joint configuration the Python controller starts with — necessary for
+    // end-to-end physics parity with the WS-bridge backend.
+    if (Array.isArray(assets.policyMeta.init_qpos_36) &&
+        assets.policyMeta.init_qpos_36.length === 36) {
+      const q0 = assets.policyMeta.init_qpos_36;
+      for (let i = 0; i < 36 && i < this.data.qpos.length; i++) this.data.qpos[i] = q0[i];
+      mujoco.mj_forward(this.model, this.data);
+    } else {
+      // Fallback: fall back to MotionGraphRuntime's stop frame. Less accurate but
+      // keeps the demo runnable when init_qpos_36 isn't baked into policy_meta.
+      console.warn("[scene] policy_meta.init_qpos_36 missing; falling back to motion graph Stop pose");
       const init = this.motionGraph.step("Stop", null, 0);
       const q0 = qposFromRuntimePose(
         init.joint_pos_isaac, init.root_pos_w, init.root_quat_wxyz, this.policy.ISAAC_TO_MUJOCO,
@@ -594,6 +610,11 @@ export class MuJoCoDemo {
     };
     this._perfDom = this._installPerfOverlay();
     console.log("[scenebot] full-browser runtime initialized");
+
+    // Drive the sim with a setTimeout loop so cadence is independent of rAF
+    // throttling (Chromium throttles rAF heavily when the page is occluded /
+    // backgrounded / under headless Xvfb).
+    this._startSimLoop();
   }
 
   _installPerfOverlay() {
@@ -927,7 +948,12 @@ export class MuJoCoDemo {
       }
       mujoco.mj_step(this.model, this.data);
     }
-    // Sync Three.js body transforms to the latest world pose.
+  }
+
+  /** Pull the latest data.xpos/xquat into Three.js body transforms. Cheap
+   *  enough to call every rAF frame; safe to call without holding a sim
+   *  step lock because we only read MuJoCo arrays. */
+  _syncBodyTransformsFromMujoco() {
     for (let bIdx = 0; bIdx < this.model.nbody; bIdx++) {
       if (this.bodies[bIdx]) {
         getPosition(this.data.xpos, bIdx, this.bodies[bIdx].position);
@@ -949,6 +975,49 @@ export class MuJoCoDemo {
     }
   }
 
+  /** setTimeout-driven sim loop: runs the motion graph + policy + physics at
+   *  a real 50 Hz wall-clock cadence, decoupled from rAF so it stays fast even
+   *  when the renderer is throttled (occluded tab, headless, etc.). Each tick
+   *  re-arms a setTimeout for the next slot, accounting for the time the
+   *  previous tick took. */
+  _startSimLoop() {
+    if (this._simLoopRunning) return;
+    this._simLoopRunning = true;
+    const policyDtMs = this._policyDt * 1000;
+    let nextDeadline = performance.now() + policyDtMs;
+    const tick = async () => {
+      if (!this._simLoopRunning) return;
+      const tBefore = performance.now();
+      try {
+        await this._stepFullBrowserOnce();
+        if (this._perf) {
+          const dur = performance.now() - tBefore;
+          this._perf.stepDurMs[this._perf.stepIdx] = dur;
+          this._perf.stepIdx = (this._perf.stepIdx + 1) % this._perf.stepDurMs.length;
+          this._perf.tickCount++;
+        }
+      } catch (e) {
+        console.error("[sim loop] step failed:", e);
+      }
+      // Self-correcting cadence: figure out when next tick should fire.
+      nextDeadline += policyDtMs;
+      let delay = nextDeadline - performance.now();
+      // If we fell more than 100ms behind (background tab woke up), drop
+      // accumulated debt rather than firing a burst.
+      if (delay < -100) {
+        nextDeadline = performance.now() + policyDtMs;
+        delay = policyDtMs;
+      }
+      if (delay < 0) delay = 0;
+      setTimeout(tick, delay);
+    };
+    setTimeout(tick, policyDtMs);
+  }
+
+  _stopSimLoop() {
+    this._simLoopRunning = false;
+  }
+
   async render(timeMS) {
     // If the model isn't ready yet, skip rendering this frame.
     if (!this.model || !this.data) {
@@ -957,9 +1026,13 @@ export class MuJoCoDemo {
     this.updateSpeedModeIndicator();
     this.controls.update();
 
-    // Full-browser mode: run motion graph + policy + sim entirely client-side.
+    // Full-browser mode: motion graph + policy + sim run on a separate
+    // setTimeout-driven loop (started in _initFullBrowser). The render path
+    // here only syncs Three.js body transforms and draws — keeping it light
+    // means sim cadence stays at 50 Hz even when rAF is throttled (background
+    // tab, headless Chromium, occluded window, etc.).
     if (this.runMode === "browser" && this.motionGraph && this.policy) {
-      await this._tickFullBrowser(timeMS);
+      this._syncBodyTransformsFromMujoco();
       this.renderer.render(this.scene, this.camera);
       return;
     }

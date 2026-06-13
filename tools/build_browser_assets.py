@@ -381,6 +381,42 @@ def main() -> None:
         onnx_meta, yaml_cfg, params_const, obs_dim=obs_dim, action_dim=action_dim,
     )
     pmeta["onnx_sha256"] = _hash_file(args.policy_onnx)
+
+    # Bake in the initial MuJoCo qpos so the browser can seed data.qpos[0:36]
+    # with the same world-frame init pose Python uses (mujoco_env.py line 213-219:
+    # data.qpos[:3] = sim_init_root_pos; data.qpos[3:7] = wxyz reorder of orn;
+    # data.qpos[7:36] = sim_init_joint_pos[ISAAC_TO_MUJOCO]).
+    # Source = frame ref_motion_start_index (default 0) of the ref motion .npz
+    # referenced by the YAML.
+    ref_motion_path_str = yaml_cfg["rl_policy"].get("ref_motion_path", "")
+    if ref_motion_path_str:
+        ref_motion_path = Path(ref_motion_path_str)
+        if not ref_motion_path.is_absolute():
+            ref_motion_path = TML_DIR / ref_motion_path
+        if ref_motion_path.is_file():
+            print(f"[build] reading init pose from {ref_motion_path.name} frame 0")
+            ref = np.load(ref_motion_path)
+            si = int(yaml_cfg["rl_policy"].get("ref_motion_start_index", 0))
+            si = max(0, min(si, ref["body_pos_w"].shape[0] - 1))
+            root_pos = ref["body_pos_w"][si, 0]                   # (3,)
+            root_quat_wxyz = ref["body_quat_w"][si, 0]            # already wxyz
+            joint_isaac = ref["joint_pos"][si]                    # (29,) Isaac order
+            isaac_to_mujoco = params_const["ISAAC_TO_MUJOCO"]
+            joint_mujoco = [float(joint_isaac[i]) for i in isaac_to_mujoco]
+            init_qpos_36 = (
+                [float(x) for x in root_pos] +
+                [float(x) for x in root_quat_wxyz] +
+                joint_mujoco
+            )
+            assert len(init_qpos_36) == 36
+            pmeta["init_qpos_36"] = init_qpos_36
+            pmeta["ref_motion_start_index"] = si
+            print(f"[build]   init root_pos=({init_qpos_36[0]:.3f}, {init_qpos_36[1]:.3f}, {init_qpos_36[2]:.3f})")
+        else:
+            print(f"[build] WARNING: ref_motion_path {ref_motion_path} missing — init_qpos_36 not baked")
+    else:
+        print("[build] WARNING: yaml has no ref_motion_path — init_qpos_36 not baked")
+
     (args.out / "policy_meta.json").write_text(json.dumps(pmeta, indent=2, sort_keys=True))
 
     print(f"[build] copying ONNX policy ({args.policy_onnx.stat().st_size / (1024 * 1024):.1f} MB)")
