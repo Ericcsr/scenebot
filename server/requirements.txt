@@ -1,1 +1,29 @@
+# scenebot — server-authoritative mode requirements (route A).
+#
+# These are the Python packages the launcher and patched controller/motion-graph
+# need on top of the upstream tml_humanoid_deploy and robot_motion_stitching
+# requirements files.
+#
+# To install everything in one shot from a fresh venv:
+#
+#   pip install -r scenebot/server/requirements.txt
+#   pip install -r tml_humanoid_deploy/requirements.txt
+#   pip install -r robot_motion_stitching/requirements.txt
+#   pip install git+https://github.com/unitreerobotics/unitree_sdk2_python
+#
+# unitree_sdk2py is a hard dep of utils/robot_utils.py inside tml_humanoid_deploy
+# but is NOT pinned in its upstream requirements.txt, so the install command
+# above is required.
+
+# WebSocket bridge
 websockets>=12.0
+
+# imported by run_motion_graph.py (via pynput.keyboard) and as a direct dep
+# of run_motion_graph for the live-keyboard path; the listener is wrapped in
+# a try/except so on a headless box pynput can fail to import — but we still
+# need it on most desktop / xvfb-equipped boxes.
+pynput
+
+# imported by run_controller.py to load experiment_streaming.yaml; not in
+# tml_humanoid_deploy/requirements.txt.
+pyyaml

@@ -53,29 +53,21 @@ git apply ../scenebot/patches/robot_motion_stitching.patch
 If `git apply` fails because either repo has moved on, the patches are small
 enough to read and port by hand — they're under `scenebot/patches/`.
 
-### 3. Stage the scenebot policy + motion bundle into tml_humanoid_deploy
+### 3. Unzip the policy + motion bundle into tml_humanoid_deploy
 
-The streaming policy (`model_42000_fix_hand.onnx`) and the stitched reference
-motion (`stitched_motion.npz`) are not in the upstream repo — ask Sirui Chen
-for the `scenebot.zip` (~31 MB). Unzip into `tml_humanoid_deploy/exported_policies/`
-so you end up with:
-
-```
-tml_humanoid_deploy/exported_policies/scenebot/
-├── experiment_streaming.yaml
-├── model_42000_fix_hand.onnx
-└── stitched_motion.npz
-```
-
-Also copy the `flat_hand` MuJoCo scene XML from robot_motion_stitching into
-tml_humanoid_deploy (these aren't in either upstream by default):
+The streaming policy (`model_42000_fix_hand.onnx`, 33 MB) and the stitched
+reference motion (`stitched_motion.npz`) live in
+`scenebot/assets/scenebot_policy_bundle.zip` for convenience.
 
 ```bash
-cp ~/scenebot-deploy/robot_motion_stitching/assets/g1/scene_29dof_flat_hand.xml \
-   ~/scenebot-deploy/tml_humanoid_deploy/assets/g1/
-cp ~/scenebot-deploy/robot_motion_stitching/assets/g1/g1_29dof_flat_hand.xml \
-   ~/scenebot-deploy/tml_humanoid_deploy/assets/g1/
+cd ~/scenebot-deploy/tml_humanoid_deploy/exported_policies
+unzip ../../scenebot/assets/scenebot_policy_bundle.zip
+ls scenebot/   # → experiment_streaming.yaml  model_42000_fix_hand.onnx  stitched_motion.npz
 ```
+
+The `flat_hand` MuJoCo scene XML files (`scene_29dof_flat_hand.xml`,
+`g1_29dof_flat_hand.xml`) are already in the upstream tml_humanoid_deploy
+repo at the patch commit, so no copy step is needed.
 
 ### 4. Install system + Python deps
 
@@ -83,12 +75,17 @@ cp ~/scenebot-deploy/robot_motion_stitching/assets/g1/g1_29dof_flat_hand.xml \
 # system
 sudo apt-get install -y redis-server xvfb
 sudo sysctl -w fs.inotify.max_user_watches=524288   # vite hot-reload likes more inotify slots
+```
 
-# python (use a fresh venv if you don't want to pollute your system python)
+Python (use a fresh venv if you'd rather not pollute system python):
+
+```bash
 pip install -r ~/scenebot-deploy/scenebot/server/requirements.txt
 pip install -r ~/scenebot-deploy/tml_humanoid_deploy/requirements.txt
 pip install -r ~/scenebot-deploy/robot_motion_stitching/requirements.txt
-pip install pynput   # not in motion_stitching's requirements but its module imports it
+# unitree_sdk2py is a hard dep of utils/robot_utils.py inside tml_humanoid_deploy
+# but is NOT in its requirements.txt; install it from GitHub:
+pip install git+https://github.com/unitreerobotics/unitree_sdk2_python
 ```
 
 GPU is **not** required — everything runs on CPU. With the thread caps the
@@ -210,6 +207,8 @@ scenebot/                          (this repo)
 ├── patches/                        small patches applied to upstream repos
 │   ├── tml_humanoid_deploy.patch     thread caps + render_state SET + HEADLESS_AUTO + scene dump
 │   └── robot_motion_stitching.patch  --web-keys flag + redis web_keys subscriber
+├── assets/
+│   └── scenebot_policy_bundle.zip  policy.onnx + stitched_motion.npz + experiment_streaming.yaml
 └── tools/                          offline asset bundling
     └── build_browser_assets.py
 ```
@@ -220,7 +219,7 @@ External (sibling clones expected by `server/run_all.sh`):
 ~/scenebot-deploy/
 ├── scenebot/                       (this repo)
 ├── tml_humanoid_deploy/            github.com/Ericcsr/tml_humanoid_deploy
-│   └── exported_policies/scenebot/   (unzipped from scenebot.zip — get from Sirui)
+│   └── exported_policies/scenebot/   (from scenebot/assets/scenebot_policy_bundle.zip)
 └── robot_motion_stitching/         github.com/Ericcsr/robot_motion_stitching
 ```
 
