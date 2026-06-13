@@ -279,7 +279,7 @@ index c2bf8f9..ab39c55 100644
  import pickle
  import redis
 diff --git a/run_controller.py b/run_controller.py
-index d47c3e1..587d58f 100644
+index d47c3e1..f227c01 100644
 --- a/run_controller.py
 +++ b/run_controller.py
 @@ -208,6 +208,7 @@ if __name__ == "__main__":
@@ -299,3 +299,34 @@ index d47c3e1..587d58f 100644
          # Only start ref motion visualizer when --metric is enabled
          if args.metric:
              ref_vis_process = start_ref_visualizer_process(
+@@ -356,6 +357,21 @@ if __name__ == "__main__":
+                 slow_down_times=slow_down_times,
+             )                    
+     elif config.get("use_streaming_motion", False):
++        # When --session-id is set, suffix every streaming channel name with
++        # ":<sid>" so this controller only sees its own session's motion graph
++        # output. Without this, two concurrent sessions' motion graphs would
++        # publish to the same channel and the policies would receive a mix.
++        _streaming_channels = config.get("streaming_channels", None)
++        if args.session_id:
++            _base_channels = _streaming_channels or {
++                "lower_cmd": "lower_cmd",
++                "vr_3point_pos_l": "vr_3point_pos_l",
++                "vr_3point_orn_l": "vr_3point_orn_l",
++                "contact_mask": "contact_mask",
++                "motion_anchor_pos_w": "motion_anchor_pos_w",
++                "motion_anchor_orn_w": "motion_anchor_orn_w",
++            }
++            _streaming_channels = {k: f"{v}:{args.session_id}" for k, v in _base_channels.items()}
+         policy = RLStreamingContactPolicy(
+             config["onnx_model_path"],
+             config["obs_names"],
+@@ -366,7 +382,7 @@ if __name__ == "__main__":
+             hist_length=config.get("history_length", 1),
+             redis_ip=config.get("streaming_redis_ip", REDIS_IP),
+             redis_port=config.get("streaming_redis_port", REDIS_PORT),
+-            redis_channels=config.get("streaming_channels", None),
++            redis_channels=_streaming_channels,
+             default_contact_label=config.get("default_contact_label", None),
+             use_8way_contact=config.get("use_8way_contact", False),
+             use_10way_contact=config.get("use_10way_contact", False),

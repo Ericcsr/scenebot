@@ -474,6 +474,12 @@ export class MuJoCoDemo {
 
     this.applySceneInitialState({ resetData: false, rebindCameras: true });
 
+    // mujoco_wasm's scene loader inserts orphan debug geoms (a red cylinder +
+    // sphere at world origin) for any geom it can't attach to a body. They show
+    // up as a giant red blob in the middle of the scene. Hide them in every
+    // mode (was previously only called from _initFullBrowser).
+    hideDebugGeoms(this.scene);
+
     // Resolve the qpos address of the dynamic free box (if it exists in the scene).
     // mujoco-js exposes mj_name2id(model, objType, name) on the module, not the model.
     // Body type is mjOBJ_BODY = 1.
@@ -530,11 +536,6 @@ export class MuJoCoDemo {
   async _initFullBrowser() {
     // Load packaged scenebot assets (motion graph, clips, contact labels, policy meta).
     const assets = await loadScenebotAssets({ onProgress: (m) => console.log("[load]", m) });
-
-    // mujoco_wasm's scene loader inserts a couple of orphan debug geoms (red cylinder
-    // + sphere at world origin) when it can't resolve a body for a geom. They show up
-    // as a giant "button" in the rendered scene. Hide them.
-    hideDebugGeoms(this.scene);
 
     this.motionGraph = new MotionGraphRuntime(
       assets.motionGraph,
