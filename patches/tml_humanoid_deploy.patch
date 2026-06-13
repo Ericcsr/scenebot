@@ -1,5 +1,5 @@
 diff --git a/mujoco_env.py b/mujoco_env.py
-index 40bb791..ffd6544 100644
+index 40bb791..37fab02 100644
 --- a/mujoco_env.py
 +++ b/mujoco_env.py
 @@ -1,10 +1,15 @@
@@ -18,7 +18,48 @@ index 40bb791..ffd6544 100644
  from scipy.spatial.transform import Rotation
  import scipy
  import pickle
-@@ -297,8 +302,31 @@ def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None)
+@@ -151,15 +156,22 @@ class ElasticBand:
+             self.enable = not self.enable
+             print(f"ElasticBand enable: {self.enable}")
+ 
+-def shared_np(size, name, dtype=np.float32):
++def _shm_name(name, session_id=None):
++    """Build a per-session SHM name. Default (no session_id) keeps the bare
++    name so the existing single-sim path stays byte-compatible."""
++    return f"{name}:{session_id}" if session_id else name
++
++
++def shared_np(size, name, dtype=np.float32, session_id=None):
++    full = _shm_name(name, session_id)
+     try:
+-        shm = SharedMemory(create=True, size=np.prod(size) * np.dtype(dtype).itemsize, name=name)
++        shm = SharedMemory(create=True, size=np.prod(size) * np.dtype(dtype).itemsize, name=full)
+         arr = np.ndarray(size, dtype=dtype, buffer=shm.buf)
+         arr[:] = 0.0
+         shm_buffer.append(shm) # prevent crash
+     except FileExistsError:
+-        print("Shared memory already exists")
+-        shm = SharedMemory(create=False, name=name)
++        print(f"Shared memory already exists: {full}")
++        shm = SharedMemory(create=False, name=full)
+         arr = np.ndarray(size, dtype=dtype, buffer=shm.buf)
+         arr[:] = 0.0
+         shm_buffer.append(shm) # prevent crash
+@@ -195,7 +207,12 @@ def _object_hand_center_world_pos(data, left_wrist_body_id, right_wrist_body_id,
+     return (left_p + right_p) * 0.5
+ 
+ 
+-def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None):
++def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None, session_id=None):
++        # session_id (optional): when set, all redis keys + shared-memory blocks
++        # used by this controller are suffixed with `:{session_id}` so multiple
++        # MujocoRobot instances can coexist without colliding on a single host.
++        # Default (session_id=None) keeps the original global-key behavior.
++        _suffix = f":{session_id}" if session_id else ""
+         try:
+             with open(xml_path, "r") as f:
+                 xml = f.read()
+@@ -297,18 +314,41 @@ def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None)
          elastic_band = ElasticBand(init_pos=band_init_pos, init_quat_xyzw=band_init_quat)
          band_attached_link = model.body("torso_link").id
  
@@ -50,9 +91,28 @@ index 40bb791..ffd6544 100644
 +            free_box_qposadr = None
 +
          ### prepare shared data
-         control = shared_np(30, "control", np.float32)
-         q = shared_np(29, "q", np.float32)
-@@ -321,8 +349,12 @@ def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None)
+-        control = shared_np(30, "control", np.float32)
+-        q = shared_np(29, "q", np.float32)
+-        dq = shared_np(29, "dq", np.float32)
+-        omega_w = shared_np(3, "omega", np.float32)
+-        imu_quat = shared_np(4, "imu_quat", np.float32)
+-        root_pos = shared_np(3, "root_pos", np.float32)
+-        root_vel = shared_np(3, "root_vel", np.float32)
+-        torso_pos = shared_np(3, "torso_pos", np.float32)
+-        torso_orn = shared_np(4, "torso_orn", np.float32)
++        control = shared_np(30, "control", np.float32, session_id=session_id)
++        q = shared_np(29, "q", np.float32, session_id=session_id)
++        dq = shared_np(29, "dq", np.float32, session_id=session_id)
++        omega_w = shared_np(3, "omega", np.float32, session_id=session_id)
++        imu_quat = shared_np(4, "imu_quat", np.float32, session_id=session_id)
++        root_pos = shared_np(3, "root_pos", np.float32, session_id=session_id)
++        root_vel = shared_np(3, "root_vel", np.float32, session_id=session_id)
++        torso_pos = shared_np(3, "torso_pos", np.float32, session_id=session_id)
++        torso_orn = shared_np(4, "torso_orn", np.float32, session_id=session_id)
+         ### prepare other data
+         kp = np.array(config['joint_stiffness'], dtype=np.float32)
+         kd = np.array(config['joint_damping'], dtype=np.float32)
+@@ -321,8 +361,12 @@ def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None)
          slam_redis_hz = float(config.get("slam_redis_hz", 10.0))
          slam_redis_period = 1.0 / slam_redis_hz if slam_redis_hz > 0 else 0.1
          torso_slam_body_id = model.body("torso_link").id
@@ -65,8 +125,18 @@ index 40bb791..ffd6544 100644
          while True:
              
              with control_lock:
-@@ -428,7 +460,7 @@ def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None)
-                 redis_client.set("head_ang_vel", pickle.dumps(head_ang_vel_w))
+@@ -422,21 +466,40 @@ def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None)
+                 )
+                 head_ang_vel_w = vel6[0:3].astype(np.float32)
+                 head_lin_vel_w = vel6[3:6].astype(np.float32)
+-                redis_client.set("head_pos", pickle.dumps(head_pos))
+-                redis_client.set("head_quat", pickle.dumps(head_quat_xyzw))
+-                redis_client.set("head_lin_vel", pickle.dumps(head_lin_vel_w))
+-                redis_client.set("head_ang_vel", pickle.dumps(head_ang_vel_w))
++                redis_client.set(f"head_pos{_suffix}", pickle.dumps(head_pos))
++                redis_client.set(f"head_quat{_suffix}", pickle.dumps(head_quat_xyzw))
++                redis_client.set(f"head_lin_vel{_suffix}", pickle.dumps(head_lin_vel_w))
++                redis_client.set(f"head_ang_vel{_suffix}", pickle.dumps(head_ang_vel_w))
                  ts = now
              if now - ts_acc > 0.02:
 -                root_rot = data.xmat[1].reshape(3, 3) 
@@ -74,9 +144,12 @@ index 40bb791..ffd6544 100644
                  linear_accel_local = root_rot.T @ (data.qacc[0:3] - np.array([0.0, 0.0, 9.81]))
                  angular_accel_local = root_rot.T @ data.qacc[3:6]
                  root_a = np.hstack([linear_accel_local, angular_accel_local])
-@@ -436,7 +468,26 @@ def run_simulation(control_lock, data_lock, xml_path, config, ticker_value=None)
-                 redis_client.set("root_a", pickle.dumps(root_a))
-                 redis_client.set("tau", pickle.dumps(data.ctrl[:]))
+-                redis_client.set("ddq", pickle.dumps(data.qacc[6:35]))
+-                redis_client.set("root_a", pickle.dumps(root_a))
+-                redis_client.set("tau", pickle.dumps(data.ctrl[:]))
++                redis_client.set(f"ddq{_suffix}", pickle.dumps(data.qacc[6:35]))
++                redis_client.set(f"root_a{_suffix}", pickle.dumps(root_a))
++                redis_client.set(f"tau{_suffix}", pickle.dumps(data.ctrl[:]))
                  ts_acc = now
 -            viewer.sync()                                                                  
 +            if now - ts_render >= render_redis_period:
@@ -95,17 +168,52 @@ index 40bb791..ffd6544 100644
 +                    *(float(x) for x in data.qpos[7:36]),
 +                    *box_floats,
 +                )
-+                redis_client.set("render_state", payload)
++                redis_client.set(f"render_state{_suffix}", payload)
 +                ts_render = now
 +            if viewer is not None:
 +                viewer.sync()
              rate.sleep()
              #print("Sim step fps:", 1/(time.time() - ts))
  
-@@ -932,8 +983,33 @@ class MujocoRobot:
+@@ -446,8 +509,10 @@ class MujocoRobot:
+             xml_path,
+             config,
+             ticker_value=None,
++            session_id=None,
+         ):
+         self.xml_path = xml_path
++        self.session_id = session_id
+         self._terrain_temp_file = None
+         xml_path_to_load = xml_path
+ 
+@@ -918,22 +983,47 @@ class MujocoRobot:
+                 raise
+             print(f"[MujocoRobot] Object loaded from {object_path}", flush=True)
+ 
+-        self.control_var = shared_np(30, "control", np.float32)
+-        self.q_var = shared_np(29, "q", np.float32)
+-        self.dq_var = shared_np(29, "dq", np.float32)
+-        self.omega_var = shared_np(3, "omega", np.float32)
+-        self.imu_quat_var = shared_np(4, "imu_quat", np.float32)
+-        self.root_pos = shared_np(3, "root_pos", np.float32)
+-        self.root_vel = shared_np(3, "root_vel", np.float32)
+-        self.torso_pos = shared_np(3, "torso_pos", np.float32)
+-        self.torso_orn = shared_np(4, "torso_orn", np.float32)
++        self.control_var = shared_np(30, "control", np.float32, session_id=session_id)
++        self.q_var = shared_np(29, "q", np.float32, session_id=session_id)
++        self.dq_var = shared_np(29, "dq", np.float32, session_id=session_id)
++        self.omega_var = shared_np(3, "omega", np.float32, session_id=session_id)
++        self.imu_quat_var = shared_np(4, "imu_quat", np.float32, session_id=session_id)
++        self.root_pos = shared_np(3, "root_pos", np.float32, session_id=session_id)
++        self.root_vel = shared_np(3, "root_vel", np.float32, session_id=session_id)
++        self.torso_pos = shared_np(3, "torso_pos", np.float32, session_id=session_id)
++        self.torso_orn = shared_np(4, "torso_orn", np.float32, session_id=session_id)
+ 
+         self.control_lock = mp.Lock()
          self.data_lock = mp.Lock()
          self.config = config
          self.control_dt = config.get("control_dt", 0.02) # default 50 Hz
+-        self.process = mp.Process(target=run_simulation, args=(self.control_lock, self.data_lock, xml_path_to_load, self.config, ticker_value))
 +        # Dump the merged scene XML so a web frontend can load the same model.
 +        # Path is fixed; web/run_all.sh copies it into mujoco_wasm/public/ before vite starts.
 +        if os.environ.get("HEADLESS_AUTO") == "1":
@@ -117,7 +225,7 @@ index 40bb791..ffd6544 100644
 +                print("[MujocoRobot] dumped merged scene XML to /tmp/web_scene.xml", flush=True)
 +            except Exception as _e:
 +                print(f"[MujocoRobot] could not dump scene XML: {_e}", flush=True)
-         self.process = mp.Process(target=run_simulation, args=(self.control_lock, self.data_lock, xml_path_to_load, self.config, ticker_value))
++        self.process = mp.Process(target=run_simulation, args=(self.control_lock, self.data_lock, xml_path_to_load, self.config, ticker_value, session_id))
          self.process.start()
 +        # Quat barrier: wait for the simulation child to publish a non-zero IMU quat before
 +        # the parent reads from shared memory (otherwise scipy's Rotation.from_quat raises
@@ -136,7 +244,7 @@ index 40bb791..ffd6544 100644
  
      def pd_control(self, target_q):
          with self.control_lock:
-@@ -960,7 +1036,11 @@ class MujocoRobot:
+@@ -960,7 +1050,11 @@ class MujocoRobot:
      def maintain_state(self, q):
          self.pd_control(q)
          self.init_q = q.copy()
@@ -170,3 +278,24 @@ index c2bf8f9..ab39c55 100644
  import time
  import pickle
  import redis
+diff --git a/run_controller.py b/run_controller.py
+index d47c3e1..587d58f 100644
+--- a/run_controller.py
++++ b/run_controller.py
+@@ -208,6 +208,7 @@ if __name__ == "__main__":
+     parser.add_argument("--net", type=str, required=False, help="Network interface for the robot controller.")
+     parser.add_argument("--metric", action="store_true", help="Compute mean joint/root errors vs reference during rollout, then exit.")
+     parser.add_argument("--slow_down", type=float, default=1.0, help="Slow down simulation and policy by x times (does not affect simulation_dt).")
++    parser.add_argument("--session-id", type=str, default=None, help="Per-session suffix for redis keys + shared-memory blocks. Used by spawn_server.py for per-user isolation; leave unset for the default single-sim path.")
+     args = parser.parse_args()
+ 
+     import yaml
+@@ -291,7 +292,7 @@ if __name__ == "__main__":
+         from ref_motion_visualizer import start_ref_visualizer_process
+ 
+         ticker_value = Value("f", float(config["ref_motion_start_index"]))
+-        env = MujocoRobot(config["mujoco_xml_path"], config, ticker_value=ticker_value)
++        env = MujocoRobot(config["mujoco_xml_path"], config, ticker_value=ticker_value, session_id=args.session_id)
+         # Only start ref motion visualizer when --metric is enabled
+         if args.metric:
+             ref_vis_process = start_ref_visualizer_process(

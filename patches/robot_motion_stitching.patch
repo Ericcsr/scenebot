@@ -1,5 +1,5 @@
 diff --git a/run_motion_graph.py b/run_motion_graph.py
-index 9d3640e..3dcf105 100644
+index 9d3640e..2a552a4 100644
 --- a/run_motion_graph.py
 +++ b/run_motion_graph.py
 @@ -2162,6 +2162,48 @@ def _run_edge_segment_headless_mode(
@@ -74,10 +74,22 @@ index 9d3640e..3dcf105 100644
      contact_resolver = ContactLabelResolver.disabled()
      redis_client: redis.Redis | None = None
      channels: dict[str, str] | None = None
-@@ -2372,6 +2421,18 @@ def parse_args() -> argparse.Namespace:
+@@ -2372,12 +2421,30 @@ def parse_args() -> argparse.Namespace:
      )
      parser.add_argument("--redis-ip", type=str, default="localhost", help="Redis host for server mode.")
      parser.add_argument("--redis-port", type=int, default=6379, help="Redis port for server mode.")
+-    parser.add_argument("--lower-cmd-channel", type=str, default="lower_cmd", help="Redis channel for lower command.")
+-    parser.add_argument("--vr-pos-channel", type=str, default="vr_3point_pos_l", help="Redis channel for local VR 3-point positions.")
+-    parser.add_argument("--vr-orn-channel", type=str, default="vr_3point_orn_l", help="Redis channel for local VR 3-point orientations.")
+-    parser.add_argument("--contact-channel", type=str, default="contact_mask", help="Redis channel for contact mask.")
+-    parser.add_argument("--anchor-pos-channel", type=str, default="motion_anchor_pos_w", help="Redis channel for target anchor/root position in world frame.")
+-    parser.add_argument("--anchor-orn-channel", type=str, default="motion_anchor_orn_w", help="Redis channel for target anchor/root orientation in world frame (xyzw).")
++    parser.add_argument(
++        "--session-id",
++        type=str,
++        default=None,
++        help="Per-session suffix appended to every redis pub/sub channel (lower_cmd, vr_*, contact_mask, motion_anchor_*, web_keys). Used by spawn_server.py for per-user isolation. Default unset = single-sim path. Explicit --*-channel overrides win over the suffix.",
++    )
 +    parser.add_argument(
 +        "--web-keys",
 +        action=argparse.BooleanOptionalAction,
@@ -87,9 +99,41 @@ index 9d3640e..3dcf105 100644
 +    parser.add_argument(
 +        "--web-keys-channel",
 +        type=str,
-+        default="web_keys",
-+        help="Redis pub/sub channel for web-driven key events.",
++        default=None,
++        help="Override redis pub/sub channel for web-driven key events. Default: 'web_keys' (or 'web_keys:{session_id}' when --session-id is set).",
 +    )
-     parser.add_argument("--lower-cmd-channel", type=str, default="lower_cmd", help="Redis channel for lower command.")
-     parser.add_argument("--vr-pos-channel", type=str, default="vr_3point_pos_l", help="Redis channel for local VR 3-point positions.")
-     parser.add_argument("--vr-orn-channel", type=str, default="vr_3point_orn_l", help="Redis channel for local VR 3-point orientations.")
++    parser.add_argument("--lower-cmd-channel", type=str, default=None, help="Override redis channel for lower command.")
++    parser.add_argument("--vr-pos-channel", type=str, default=None, help="Override redis channel for local VR 3-point positions.")
++    parser.add_argument("--vr-orn-channel", type=str, default=None, help="Override redis channel for local VR 3-point orientations.")
++    parser.add_argument("--contact-channel", type=str, default=None, help="Override redis channel for contact mask.")
++    parser.add_argument("--anchor-pos-channel", type=str, default=None, help="Override redis channel for target anchor/root position in world frame.")
++    parser.add_argument("--anchor-orn-channel", type=str, default=None, help="Override redis channel for target anchor/root orientation in world frame (xyzw).")
+     parser.add_argument(
+         "--contact-labels-dir",
+         type=Path,
+@@ -2406,7 +2473,24 @@ def parse_args() -> argparse.Namespace:
+             "wrist channels (2,3) always use label files. M/N/Z/G/P segments use full label rows."
+         ),
+     )
+-    return parser.parse_args()
++    args = parser.parse_args()
++    # Resolve per-session redis channel names. Each --*-channel arg, if not
++    # explicitly set, defaults to "<base>" or "<base>:{session_id}". Explicit
++    # --*-channel values always win.
++    _suffix = f":{args.session_id}" if args.session_id else ""
++    _defaults = {
++        "web_keys_channel":   "web_keys" + _suffix,
++        "lower_cmd_channel":  "lower_cmd" + _suffix,
++        "vr_pos_channel":     "vr_3point_pos_l" + _suffix,
++        "vr_orn_channel":     "vr_3point_orn_l" + _suffix,
++        "contact_channel":    "contact_mask" + _suffix,
++        "anchor_pos_channel": "motion_anchor_pos_w" + _suffix,
++        "anchor_orn_channel": "motion_anchor_orn_w" + _suffix,
++    }
++    for _attr, _default in _defaults.items():
++        if getattr(args, _attr, None) is None:
++            setattr(args, _attr, _default)
++    return args
+ 
+ 
+ def main() -> None:
