@@ -1,0 +1,128 @@
+{
+  "n_ticks": 900,
+  "fps": 50.0,
+  "yaw_rate_rad_s": 1.0471975511965976,
+  "pickup_step_scale": 0.5,
+  "events": [
+    {
+      "tick": 50,
+      "kind": "press",
+      "token": "w"
+    },
+    {
+      "tick": 150,
+      "kind": "release",
+      "token": "w"
+    },
+    {
+      "tick": 160,
+      "kind": "press",
+      "token": "a"
+    },
+    {
+      "tick": 210,
+      "kind": "release",
+      "token": "a"
+    },
+    {
+      "tick": 220,
+      "kind": "press",
+      "token": "q"
+    },
+    {
+      "tick": 221,
+      "kind": "release",
+      "token": "q"
+    },
+    {
+      "tick": 320,
+      "kind": "press",
+      "token": "s"
+    },
+    {
+      "tick": 380,
+      "kind": "release",
+      "token": "s"
+    },
+    {
+      "tick": 400,
+      "kind": "press",
+      "token": "k"
+    },
+    {
+      "tick": 405,
+      "kind": "release",
+      "token": "k"
+    },
+    {
+      "tick": 480,
+      "kind": "press",
+      "token": "f"
+    },
+    {
+      "tick": 481,
+      "kind": "release",
+      "token": "f"
+    },
+    {
+      "tick": 520,
+      "kind": "press",
+      "token": "g"
+    },
+    {
+      "tick": 521,
+      "kind": "release",
+      "token": "g"
+    },
+    {
+      "tick": 620,
+      "kind": "press",
+      "token": "p"
+    },
+    {
+      "tick": 621,
+      "kind": "release",
+      "token": "p"
+    },
+    {
+      "tick": 700,
+      "kind": "press",
+      "token": "l"
+    },
+    {
+      "tick": 701,
+      "kind": "release",
+      "token": "l"
+    },
+    {
+      "tick": 800,
+      "kind": "press",
+      "token": "l"
+    },
+    {
+      "tick": 801,
+      "kind": "release",
+      "token": "l"
+    },
+    {
+      "tick": 820,
+      "kind": "press",
+      "token": "ctrl"
+    },
+    {
+      "tick": 820,
+      "kind": "press",
+      "token": "w"
+    },
+    {
+      "tick": 840,
+      "kind": "release",
+      "token": "w"
+    },
+    {
+      "tick": 840,
+      "kind": "release",
+      "token": "ctrl"
+    }
+  ]
+}

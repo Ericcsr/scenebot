@@ -5,16 +5,88 @@ import { OrbitControls    } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DragStateManager } from './utils/DragStateManager.js';
 import { setupGUI, downloadExampleScenesFolder, loadSceneFromURL, drawTendonsAndFlex, getPosition, getQuaternion, toMujocoPos, standardNormal } from './mujocoUtils.js';
 import { PolicyController } from './policy/policyController.js';
+import { WSClient, WebKeyboardHandler } from './wsClient.js';
 import   load_mujoco        from 'mujoco-js/dist/mujoco_wasm.js';
+import { loadScenebotAssets, hideDebugGeoms } from './scenebot/loader.js';
+import { MotionGraphRuntime, qposFromRuntimePose } from './scenebot/motion_graph_runtime.js';
+import { KeyboardCommandState } from './scenebot/keyboard_state.js';
+import { PolicyRuntime } from './scenebot/policy_runtime.js';
 
 // Load the MuJoCo Module
 const mujoco = await load_mujoco();
 
-// Set up Emscripten's Virtual File System
-var initialScene = "g1_with_terrain.xml";
+// Thin-browser web demo: server (run_controller.py + ws_bridge.py) is authoritative.
+// Browser loads the SAME merged scene XML the server sims, receives qpos over WS,
+// runs FK via mj_forward, and renders via Three.js. No local physics, no policy.
+var initialScene = "scene_29dof_flat_hand.xml";
 mujoco.FS.mkdir('/working');
 mujoco.FS.mount(mujoco.MEMFS, { root: '.' }, '/working');
-mujoco.FS.writeFile("/working/" + initialScene, await(await fetch("../assets/scenes/" + initialScene)).text());
+
+// Stage the merged scene XML, the included g1 XML, and every <mesh file="..."/>
+// referenced by the included XML into Emscripten's MEMFS so MuJoCo's loader can
+// resolve relative paths. Vite serves the launcher-copied files at site root.
+async function stageSceneIntoMemfs(rootScene) {
+  const fetchText = async (path) => {
+    const r = await fetch(path);
+    if (!r.ok) throw new Error(`fetch ${path} failed: ${r.status}`);
+    return await r.text();
+  };
+  const fetchBin = async (path) => {
+    const r = await fetch(path);
+    if (!r.ok) throw new Error(`fetch ${path} failed: ${r.status}`);
+    return new Uint8Array(await r.arrayBuffer());
+  };
+  const ensureDir = (vfsPath) => {
+    const parts = vfsPath.split("/").filter(Boolean);
+    let cur = "/working";
+    for (let i = 0; i < parts.length - 1; i++) {
+      cur += "/" + parts[i];
+      if (!mujoco.FS.analyzePath(cur).exists) mujoco.FS.mkdir(cur);
+    }
+  };
+
+  // 1. Root scene XML.
+  const rootXml = await fetchText("/" + rootScene);
+  mujoco.FS.writeFile("/working/" + rootScene, rootXml);
+
+  // 2. Find any <include file="..."/> children referenced by the root scene and stage them.
+  const includeRe = /<include\s+file="([^"]+)"\s*\/?>/g;
+  const includedFiles = new Set();
+  let m;
+  while ((m = includeRe.exec(rootXml)) !== null) {
+    includedFiles.add(m[1]);
+  }
+  // 3. For each included XML, fetch + write, and harvest meshdir + <mesh file="..."/>.
+  const meshDirByInclude = new Map();
+  for (const inc of includedFiles) {
+    const incXml = await fetchText("/" + inc);
+    ensureDir(inc);
+    mujoco.FS.writeFile("/working/" + inc, incXml);
+    const compMatch = incXml.match(/<compiler[^>]*meshdir="([^"]+)"[^>]*\/?>/);
+    const meshDir = compMatch ? compMatch[1] : "";
+    meshDirByInclude.set(inc, meshDir);
+  }
+  // 4. For each included XML, walk its <mesh file=".."/> entries and stage each mesh.
+  const meshRe = /<mesh\s+[^>]*file="([^"]+)"[^>]*\/?>/g;
+  for (const inc of includedFiles) {
+    const incXml = mujoco.FS.readFile("/working/" + inc, { encoding: "utf8" });
+    const meshDir = meshDirByInclude.get(inc) || "";
+    const seen = new Set();
+    while ((m = meshRe.exec(incXml)) !== null) {
+      const meshFile = m[1];
+      if (seen.has(meshFile)) continue;
+      seen.add(meshFile);
+      // The full path the loader will look up (relative to the cwd at load time, which is /working)
+      const relInside = meshDir ? `${meshDir.replace(/\/$/, "")}/${meshFile}` : meshFile;
+      const memfsPath = relInside.replace(/^\.\//, "");
+      ensureDir(memfsPath);
+      const bytes = await fetchBin("/" + memfsPath);
+      mujoco.FS.writeFile("/working/" + memfsPath, bytes);
+    }
+  }
+}
+
+await stageSceneIntoMemfs(initialScene);
 
 export class MuJoCoDemo {
   constructor() {
@@ -25,7 +97,9 @@ export class MuJoCoDemo {
     this.data  = null;
 
     // Define Random State Variables
-    this.params = { scene: initialScene, paused: false, help: false, ctrlnoiserate: 0.0, ctrlnoisestd: 0.0, keyframeNumber: 0, policyEnabled: true, showRawDepth: false };
+    // policyEnabled=false and paused=true: render() short-circuits the local physics + policy
+    // pipeline. The WS-driven branch in render() supplies qpos and calls mj_forward instead.
+    this.params = { scene: initialScene, paused: true, help: false, ctrlnoiserate: 0.0, ctrlnoisestd: 0.0, keyframeNumber: 0, policyEnabled: false, showRawDepth: false };
     this.mujoco_time = 0.0;
     this.bodies  = {}, this.lights = {};
     this.tmpVec  = new THREE.Vector3();
@@ -34,6 +108,10 @@ export class MuJoCoDemo {
     this.policyController = null;
     this.policyStepCounter = 0;
     this.policyDecimation = 1;
+    // WS state (populated in init()).
+    this.ws = null;
+    this.webKeys = null;
+    this.boxQposAdr = -1;
     this.pelvisFollowOffset = new THREE.Vector3(-4.0, 1.5, 0.0);
     this.defaultJointPos = [
       0.162997201, -0.0361181423, -0.0214254409, 0.267154634, -0.174296871, 0.212671682,
@@ -155,6 +233,10 @@ export class MuJoCoDemo {
     );
     this.depthCameraPoseViz.add(this.depthCameraMarker);
     this.depthCameraView.add(this.depthCameraPoseViz);
+    // Scenebot demo doesn't use the depth camera; hide its pose marker so it doesn't
+    // show up as a giant red sphere in the main view (layer-isolation isn't reliable
+    // when the marker is parented under a Camera that's added to the main scene).
+    this.depthCameraPoseViz.visible = false;
 
     this.scene.background = new THREE.Color(0.15, 0.25, 0.35);
     // Fog: (color, near, far). Increase far so distant terrain stays visible.
@@ -356,6 +438,20 @@ export class MuJoCoDemo {
   }
 
   async init() {
+    // Route selection: <body data-mode="ws-debug"> opts in to the WS-debug entry
+    // (route A — server is authoritative, browser only renders qpos). The default
+    // entry (data-mode unset or "browser") runs sim+policy+motion-graph entirely
+    // client-side via the modules under src/scenebot/.
+    //
+    // ?backend=ws://host:port still works: it overrides the WS URL when
+    // data-mode="ws-debug", and is also a back-compat shortcut to force WS mode.
+    const params = new URLSearchParams(window.location.search);
+    const backendUrl = params.get("backend");
+    const bodyMode = (document.body && document.body.dataset.mode) || "";
+    this.runMode = (bodyMode === "ws-debug" || backendUrl) ? "ws" : "browser";
+    this.backendUrl = backendUrl || "ws://" + location.hostname + ":8765";
+    console.log(`[scenebot] runMode=${this.runMode}` + (this.runMode === "ws" ? ` backend=${this.backendUrl}` : ""));
+
     // Download the the examples to MuJoCo's virtual file system
     await downloadExampleScenesFolder(mujoco);
 
@@ -365,13 +461,170 @@ export class MuJoCoDemo {
 
     this.applySceneInitialState({ resetData: false, rebindCameras: true });
 
+    // Resolve the qpos address of the dynamic free box (if it exists in the scene).
+    // mujoco-js exposes mj_name2id(model, objType, name) on the module, not the model.
+    // Body type is mjOBJ_BODY = 1.
+    try {
+      const MJ_OBJ_BODY = 1;
+      const boxBodyId = mujoco.mj_name2id(this.model, MJ_OBJ_BODY, "free_box");
+      if (boxBodyId >= 0) {
+        const jntAdr = this.model.body_jntadr[boxBodyId];
+        if (jntAdr >= 0) {
+          this.boxQposAdr = this.model.jnt_qposadr[jntAdr];
+          console.log("[scene] free_box qpos addr =", this.boxQposAdr);
+        }
+      }
+    } catch (err) {
+      console.warn("[scene] could not resolve free_box qpos addr:", err);
+    }
+
+    if (this.runMode === "ws") {
+      console.log("[scene] connecting to", this.backendUrl);
+      this.ws = new WSClient(this.backendUrl);
+      this.webKeys = new WebKeyboardHandler(this.ws);
+    } else {
+      await this._initFullBrowser();
+    }
+
     this.gui = new GUI();
     setupGUI(this);
 
-    await this.initPolicy();
-
     // Start the render loop only after the model and assets are ready
     this.renderer.setAnimationLoop( this.render.bind(this) );
+  }
+
+  async _initFullBrowser() {
+    // Load packaged scenebot assets (motion graph, clips, contact labels, policy meta).
+    const assets = await loadScenebotAssets({ onProgress: (m) => console.log("[load]", m) });
+
+    // mujoco_wasm's scene loader inserts a couple of orphan debug geoms (red cylinder
+    // + sphere at world origin) when it can't resolve a body for a geom. They show up
+    // as a giant "button" in the rendered scene. Hide them.
+    hideDebugGeoms(this.scene);
+
+    this.motionGraph = new MotionGraphRuntime(
+      assets.motionGraph,
+      assets.clipBundle,
+      assets.contactLabels,
+      {
+        fps: assets.policyMeta.control_dt > 0 ? 1.0 / assets.policyMeta.control_dt : 50.0,
+        contactDim: assets.policyMeta.contact_dim,
+        defaultContactLabel: assets.policyMeta.default_contact_label,
+        contactLabelsMnOnly: true,
+        pickupForwardStepScale: 0.5, // matches --slow-pickup-2x default
+      },
+    );
+
+    this.kb = new KeyboardCommandState();
+    this.kb.attachDom();
+
+    this.policy = await PolicyRuntime.create(assets.policyOnnxUrl, assets.policyMeta);
+
+    // Persistent reusable scratch arrays.
+    this._lastTargetQ = null;
+    this._policyDt = assets.policyMeta.control_dt; // 0.02 s = 50 Hz
+    this._simDt = assets.policyMeta.simulation_dt; // 0.005 s = 200 Hz
+    this._stepsPerControl = Math.max(1, Math.round(this._policyDt / this._simDt));
+    this._kp = Float32Array.from(assets.policyMeta.joint_stiffness);
+    this._kd = Float32Array.from(assets.policyMeta.joint_damping);
+    this._torqueLimit = Float32Array.from(assets.policyMeta.torque_limit);
+    this._yawRateRadPerS = (60 * Math.PI) / 180; // mirrors --yaw-adjust-deg-per-s default
+
+    // Initialize sim qpos[0:36] to a sensible standing pose: pull from MotionGraphRuntime's
+    // initial pose so the first frame doesn't fall through the floor.
+    {
+      const init = this.motionGraph.step("Stop", null, 0);
+      const q0 = qposFromRuntimePose(
+        init.joint_pos_isaac, init.root_pos_w, init.root_quat_wxyz, this.policy.ISAAC_TO_MUJOCO,
+      );
+      for (let i = 0; i < 36 && i < this.data.qpos.length; i++) this.data.qpos[i] = q0[i];
+      mujoco.mj_forward(this.model, this.data);
+    }
+
+    this._policyAccumMs = 0;
+    this._lastTickerMs = -1;
+
+    // Perf overlay: right-side panel showing live policy/physics/render rates and timing.
+    this._perf = {
+      tickCount: 0,
+      renderCount: 0,
+      lastResetMs: performance.now(),
+      // ring buffers (last N timings, in ms)
+      stepDurMs: new Float32Array(120),
+      stepIdx: 0,
+      inferDurMs: new Float32Array(120),
+      inferIdx: 0,
+      mjStepDurMs: new Float32Array(120),
+      mjStepIdx: 0,
+    };
+    this._perfDom = this._installPerfOverlay();
+    console.log("[scenebot] full-browser runtime initialized");
+  }
+
+  _installPerfOverlay() {
+    const root = document.createElement("div");
+    root.id = "scenebot-perf";
+    root.style.cssText = [
+      "position:absolute",
+      "top:60px",
+      "left:16px",
+      "z-index:1300",
+      "padding:10px 14px",
+      "background:rgba(0,0,0,0.65)",
+      "color:#cfe9ff",
+      "font:12px/1.4 ui-monospace,Menlo,Consolas,monospace",
+      "border-radius:8px",
+      "white-space:pre",
+      "pointer-events:none",
+    ].join(";");
+    root.textContent = "perf: warming up…";
+    (this.container || document.body).appendChild(root);
+    return root;
+  }
+
+  _updatePerfOverlay() {
+    if (!this._perfDom) return;
+    const now = performance.now();
+    const dt = now - this._perf.lastResetMs;
+    if (dt < 500) return;
+    const policyHz = (this._perf.tickCount * 1000) / dt;
+    const renderHz = (this._perf.renderCount * 1000) / dt;
+    const avg = (arr) => {
+      let s = 0, n = 0;
+      for (let i = 0; i < arr.length; i++) if (arr[i] > 0) { s += arr[i]; n++; }
+      return n ? s / n : 0;
+    };
+    const max = (arr) => {
+      let m = 0;
+      for (let i = 0; i < arr.length; i++) if (arr[i] > m) m = arr[i];
+      return m;
+    };
+    const stepAvg = avg(this._perf.stepDurMs);
+    const stepMax = max(this._perf.stepDurMs);
+    const infAvg = avg(this._perf.inferDurMs);
+    const infMax = max(this._perf.inferDurMs);
+    const mjAvg = avg(this._perf.mjStepDurMs);
+    const mjMax = max(this._perf.mjStepDurMs);
+    const targetPolicyHz = 1.0 / this._policyDt;
+    const ratio = (policyHz / targetPolicyHz) * 100;
+
+    const line = (label, val, unit) =>
+      `${label.padEnd(11)} ${String(val).padStart(7)} ${unit}`;
+    const fmt = (n, d = 1) => Number.isFinite(n) ? n.toFixed(d) : "—";
+
+    this._perfDom.textContent = [
+      `policy   ${fmt(policyHz, 1).padStart(5)} Hz   ` +
+        `target ${targetPolicyHz.toFixed(0)} Hz  (${fmt(ratio, 0)}%)`,
+      `render   ${fmt(renderHz, 1).padStart(5)} Hz`,
+      `step     avg ${fmt(stepAvg, 2).padStart(6)} ms   max ${fmt(stepMax, 2)} ms`,
+      `  ONNX     ${fmt(infAvg, 2).padStart(6)} ms   max ${fmt(infMax, 2)} ms`,
+      `  mj_step×${this._stepsPerControl} ${fmt(mjAvg, 2).padStart(6)} ms   max ${fmt(mjMax, 2)} ms`,
+    ].join("\n");
+
+    // reset per-second window
+    this._perf.tickCount = 0;
+    this._perf.renderCount = 0;
+    this._perf.lastResetMs = now;
   }
 
   bindTrackingTargets() {
@@ -525,6 +778,142 @@ export class MuJoCoDemo {
     this.depthFrame = new Float32Array(this.depthCameraConfig.width * this.depthCameraConfig.height);
   }
 
+  /**
+   * Full-browser per-RAF tick: drives the motion graph + policy at 50 Hz and steps physics
+   * at 200 Hz, mirroring the cadence of the Python backend (control_dt=0.02, simulation_dt=0.005).
+   *
+   * @param {number} timeMS  performance.now() from setAnimationLoop
+   */
+  async _tickFullBrowser(timeMS) {
+    if (this._lastTickerMs < 0) {
+      this._lastTickerMs = timeMS;
+      this._policyAccumMs = 0;
+    }
+    let elapsedMs = timeMS - this._lastTickerMs;
+    if (elapsedMs > 250) elapsedMs = 250;
+    this._lastTickerMs = timeMS;
+    this._policyAccumMs += elapsedMs;
+    if (this._perf) this._perf.renderCount++;
+
+    const policyDtMs = this._policyDt * 1000;
+    while (this._policyAccumMs >= policyDtMs) {
+      this._policyAccumMs -= policyDtMs;
+      const t0 = performance.now();
+      await this._stepFullBrowserOnce();
+      if (this._perf) {
+        const dur = performance.now() - t0;
+        this._perf.stepDurMs[this._perf.stepIdx] = dur;
+        this._perf.stepIdx = (this._perf.stepIdx + 1) % this._perf.stepDurMs.length;
+        this._perf.tickCount++;
+      }
+    }
+    this._updatePerfOverlay();
+  }
+
+  async _stepFullBrowserOnce() {
+    // 1) Pull keyboard state.
+    const desired = this.kb.getCommand();
+    const ctrlSkipCmd = this.kb.pollCtrlSkipToStop();
+    const sitToggleCmd = this.kb.pollSitToggleCommand();
+    const latchedCommand = sitToggleCmd != null ? sitToggleCmd : desired;
+    const dyaw = this.kb.pollYawAdjustment(this._policyDt, this._yawRateRadPerS);
+
+    // 2) Step motion graph → stream packet (lower_cmd / vr_* / contact_mask / motion_anchor_*).
+    const packet = this.motionGraph.step(latchedCommand, ctrlSkipCmd, dyaw);
+
+    // 3) Optional upper-body freeze (F): take snapshot when freeze toggles enabled.
+    const freezeEv = this.kb.pollUpperBodyFreezeToggle();
+    if (freezeEv === "enabled") {
+      this.kb.setUpperBodyFreezeSnapshot(
+        packet.joint_pos_isaac, packet.contact_mask, packet.vr_3point_pos_l, packet.vr_3point_orn_l,
+      );
+    } else if (freezeEv === "disabled") {
+      this.kb.clearUpperBodyFreezeSnapshot();
+    }
+    this.kb.applyFrozenUpperToStreamPacket(packet);
+
+    // 4) Feed packet into the policy's "latest streaming inputs".
+    this.policy.ingestStreamPacket(packet);
+
+    // 5) Build robotState snapshot from MuJoCo.
+    const robotState = this._readRobotState();
+
+    // 6) Run policy.
+    const controlSignals = this.policy.prepareControlSignals(robotState);
+    const obs = this.policy.prepareObs(robotState, controlSignals);
+    const tInf = performance.now();
+    const rawAction = await this.policy.getAction(obs);
+    if (this._perf) {
+      const dur = performance.now() - tInf;
+      this._perf.inferDurMs[this._perf.inferIdx] = dur;
+      this._perf.inferIdx = (this._perf.inferIdx + 1) % this._perf.inferDurMs.length;
+    }
+    const targetQ = this.policy.applyControl(rawAction);
+    this._lastTargetQ = targetQ;
+
+    // 7) Inner physics loop: step MuJoCo `_stepsPerControl` times with PD control toward targetQ.
+    const tMj = performance.now();
+    this._innerPhysicsSteps(targetQ);
+    if (this._perf) {
+      const dur = performance.now() - tMj;
+      this._perf.mjStepDurMs[this._perf.mjStepIdx] = dur;
+      this._perf.mjStepIdx = (this._perf.mjStepIdx + 1) % this._perf.mjStepDurMs.length;
+    }
+  }
+
+  _readRobotState() {
+    // Pull qpos[7:36] (29 joints), qvel[6:35] (29 vel), qpos[3:7] (root quat wxyz), qvel[3:6] (omega),
+    // qpos[0:3] (root pos), qvel[0:3] (root vel) out of MuJoCo. Match what mujoco_env.py shares.
+    const qpos = this.data.qpos, qvel = this.data.qvel;
+    const q = new Float32Array(29);
+    const dq = new Float32Array(29);
+    for (let i = 0; i < 29; i++) { q[i] = qpos[7 + i]; dq[i] = qvel[6 + i]; }
+    const omega = new Float32Array([qvel[3], qvel[4], qvel[5]]);
+    // imu_quat is wxyz (G1RobotState comment); root_orn is xyzw (mocap convention).
+    const wxyz = [qpos[3], qpos[4], qpos[5], qpos[6]];
+    const imu_quat = Float32Array.from(wxyz);
+    const root_orn = Float32Array.from([wxyz[1], wxyz[2], wxyz[3], wxyz[0]]);
+    const root_pos = Float32Array.from([qpos[0], qpos[1], qpos[2]]);
+    const root_vel = Float32Array.from([qvel[0], qvel[1], qvel[2]]);
+    return { q, dq, omega, imu_quat, root_pos, root_orn, root_vel };
+  }
+
+  _innerPhysicsSteps(targetQ) {
+    // PD: data.ctrl = (targetQ - q) * kp - dq * kd, clipped to torque limits.
+    const ctrl = this.data.ctrl;
+    const qpos = this.data.qpos, qvel = this.data.qvel;
+    for (let s = 0; s < this._stepsPerControl; s++) {
+      for (let i = 0; i < 29; i++) {
+        let tau = (targetQ[i] - qpos[7 + i]) * this._kp[i] - qvel[6 + i] * this._kd[i];
+        const lim = this._torqueLimit[i];
+        if (tau > lim) tau = lim;
+        else if (tau < -lim) tau = -lim;
+        ctrl[i] = tau;
+      }
+      mujoco.mj_step(this.model, this.data);
+    }
+    // Sync Three.js body transforms to the latest world pose.
+    for (let bIdx = 0; bIdx < this.model.nbody; bIdx++) {
+      if (this.bodies[bIdx]) {
+        getPosition(this.data.xpos, bIdx, this.bodies[bIdx].position);
+        getQuaternion(this.data.xquat, bIdx, this.bodies[bIdx].quaternion);
+        this.bodies[bIdx].updateWorldMatrix();
+      }
+    }
+    if (this.pelvisBody && this.pelvisFollowOffset) {
+      this.camera.position.copy(this.pelvisBody.position).add(this.pelvisFollowOffset);
+      this.controls.target.copy(this.pelvisBody.position);
+      this.controls.update();
+    }
+    for (let l = 0; l < this.model.nlight; l++) {
+      if (this.lights[l]) {
+        getPosition(this.data.light_xpos, l, this.lights[l].position);
+        getPosition(this.data.light_xdir, l, this.tmpVec);
+        this.lights[l].lookAt(this.tmpVec.add(this.lights[l].position));
+      }
+    }
+  }
+
   async render(timeMS) {
     // If the model isn't ready yet, skip rendering this frame.
     if (!this.model || !this.data) {
@@ -532,6 +921,57 @@ export class MuJoCoDemo {
     }
     this.updateSpeedModeIndicator();
     this.controls.update();
+
+    // Full-browser mode: run motion graph + policy + sim entirely client-side.
+    if (this.runMode === "browser" && this.motionGraph && this.policy) {
+      await this._tickFullBrowser(timeMS);
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
+
+    // Thin-browser web demo: server is authoritative. Pull the latest qpos from the WS
+    // client, write into MuJoCo's data buffer, run FK, then fall through to the body
+    // transform sync below. This bypasses the local physics loop and policy entirely.
+    if (this.ws && this.ws.latestQpos) {
+      const q = this.ws.latestQpos; // Float32Array(36)
+      // qpos layout: [root_xyz(3), root_quat_wxyz(4), joints(29), ...].
+      // The first 36 entries map 1:1 to data.qpos[0:36] for the G1 model.
+      for (let i = 0; i < 36 && i < this.data.qpos.length; i++) {
+        this.data.qpos[i] = q[i];
+      }
+      if (this.boxQposAdr >= 0 && this.ws.latestBox) {
+        const b = this.ws.latestBox; // Float32Array(7)
+        for (let i = 0; i < 7 && (this.boxQposAdr + i) < this.data.qpos.length; i++) {
+          this.data.qpos[this.boxQposAdr + i] = b[i];
+        }
+      }
+      mujoco.mj_forward(this.model, this.data);
+
+      // Update body / light transforms (mirrors the post-step block lower in the
+      // function; keeping it here so we can early-return).
+      for (let bIdx = 0; bIdx < this.model.nbody; bIdx++) {
+        if (this.bodies[bIdx]) {
+          getPosition  (this.data.xpos , bIdx, this.bodies[bIdx].position);
+          getQuaternion(this.data.xquat, bIdx, this.bodies[bIdx].quaternion);
+          this.bodies[bIdx].updateWorldMatrix();
+        }
+      }
+      if (this.pelvisBody && this.pelvisFollowOffset) {
+        this.camera.position.copy(this.pelvisBody.position).add(this.pelvisFollowOffset);
+        this.controls.target.copy(this.pelvisBody.position);
+        this.controls.update();
+      }
+      for (let l = 0; l < this.model.nlight; l++) {
+        if (this.lights[l]) {
+          getPosition(this.data.light_xpos, l, this.lights[l].position);
+          getPosition(this.data.light_xdir, l, this.tmpVec);
+          this.lights[l].lookAt(this.tmpVec.add(this.lights[l].position));
+        }
+      }
+
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
 
     // Auto-forward when robot is near terrain boxes (climbing zones)
     if (this.policyController && this.params.policyEnabled && this.params.scene === initialScene) {
@@ -778,4 +1218,5 @@ export class MuJoCoDemo {
 }
 
 let demo = new MuJoCoDemo();
+window.demo = demo; // exposed for headless verification + browser console debugging
 await demo.init();

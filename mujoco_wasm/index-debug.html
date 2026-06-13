@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>scenebot — WS debug</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <meta name="application-name"   content="scenebot-ws-debug">
+        <meta name="description"        content="Route A: server-authoritative scenebot demo (WS bridge to MuJoCo+motion-graph backend)">
+        <meta name="viewport"           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no, shrink-to-fit=0">
+        <meta name="theme-color"        content="#ffffff">
+        <link rel ="icon" type="image/x-icon" href="./assets/favicon.png">
+    </head>
+
+    <!-- data-mode="ws-debug" routes main.js to the WS bridge path. Pair with
+         ?backend=ws://host:8765 in the URL to point at a non-default bridge. -->
+    <body data-mode="ws-debug"
+          style="margin:0px; background-color:rgb(255, 255, 255); overflow:hidden; position:fixed; min-height: 100%;
+                 touch-action: none;
+                 -webkit-touch-callout: none;
+                 -webkit-user-select: none;
+                 -khtml-user-select: none;
+                 -moz-user-select: none;
+                 -ms-user-select: none;
+                 user-select: none;">
+        <h1 hidden></h1>
+
+        <div id="appbody" style="position: absolute;">
+            <script type="module" src="./src/main.js"></script>
+        </div>
+    </body>
+</html>

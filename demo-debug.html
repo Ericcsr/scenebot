@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Scenebot WS-debug demo (route A: server-authoritative)">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scenebot — WS debug</title>
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { overflow: hidden; background: #0f172a; }
+    .demo-glass {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    .badge-debug {
+      position: absolute;
+      left: 50%;
+      top: 6px;
+      transform: translateX(-50%);
+      background: rgba(220, 38, 38, 0.95);
+      color: #fff;
+      font-weight: 700;
+      padding: 0.5rem 1.1rem;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+      font-size: 0.95rem;
+    }
+  </style>
+  <script>
+    // Allow the WS bridge URL to be overridden via this page's ?backend=...
+    // query param. Defaults to ws://<this-host>:8765 (matches web/run_all.sh).
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const backend = params.get("backend") || ("ws://" + location.hostname + ":8765");
+      window.__SCENEBOT_BACKEND__ = backend;
+      window.addEventListener("DOMContentLoaded", () => {
+        const frame = document.getElementById("demoFrame");
+        if (!frame) return;
+        const url = new URL(frame.getAttribute("src"), window.location.href);
+        url.searchParams.set("backend", backend);
+        frame.src = url.toString();
+        const label = document.getElementById("backendLabel");
+        if (label) label.textContent = backend;
+      });
+    })();
+  </script>
+</head>
+
+<body>
+  <section class="section interactive-demo-section" style="background-color: #0f172a; min-height: 100vh; padding: 0;">
+    <div class="demo-display-container" style="height: 100vh; width: 100vw; position: relative; overflow: hidden;">
+      <!-- Iframe target is the WS-debug entry. The main.js inside that page reads
+           <body data-mode="ws-debug"> and connects to ?backend=...; the script in
+           the head above injects the right URL at load time. -->
+      <iframe
+        id="demoFrame"
+        src="./mujoco_wasm/index-debug.html"
+        loading="lazy"
+        style="width: 100%; height: 100%; border: none;"
+        title="Scenebot WS-debug">
+        Your browser does not support iframes.
+      </iframe>
+
+      <div class="badge-debug">⚙ ROUTE A — backend at <span id="backendLabel">ws://localhost:8765</span></div>
+
+      <div class="demo-glass" style="position: absolute; right: 16px; bottom: 16px; padding: 1rem 1.25rem; border-radius: 14px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2); max-width: 480px;">
+        <h3 class="title is-5" style="margin-bottom: 0.6rem; color: #333;">Backend-authoritative debug</h3>
+        <div style="font-size: 1rem; line-height: 1.5; color: #444;">
+          The server runs the MuJoCo sim, ONNX policy, and motion graph; the
+          browser only renders <code>qpos</code> coming over WebSocket. Use this
+          page to compare the WASM viewport against the native MuJoCo viewer when
+          <code>./web/run_all.sh</code> is running.
+          <br><br>
+          For the public, self-contained demo see <a href="./demo.html">demo.html</a>.
+        </div>
+      </div>
+
+      <a class="button is-light is-rounded" href="./index.html" style="position: absolute; left: 16px; top: 16px;">← Back to main page</a>
+    </div>
+  </section>
+</body>
+</html>

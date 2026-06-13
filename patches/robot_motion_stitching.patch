@@ -1,0 +1,95 @@
+diff --git a/run_motion_graph.py b/run_motion_graph.py
+index 9d3640e..3dcf105 100644
+--- a/run_motion_graph.py
++++ b/run_motion_graph.py
+@@ -2162,6 +2162,48 @@ def _run_edge_segment_headless_mode(
+         print("[headless] Stopped by user.", flush=True)
+ 
+ 
++def _start_web_key_subscriber(
++    kb: "KeyboardCommandState",
++    redis_host: str,
++    redis_port: int,
++    channel: str,
++) -> threading.Thread:
++    """Daemon thread: subscribe to Redis pub/sub `channel`, forward (event, token)
++    pairs to the keyboard state machine with source='web'. Bridge publishes
++    pickle.dumps(("press"|"release", token)) on this channel."""
++
++    def _run() -> None:
++        while True:
++            try:
++                client = redis.Redis(host=redis_host, port=int(redis_port), db=0)
++                pubsub = client.pubsub(ignore_subscribe_messages=True)
++                pubsub.subscribe(channel)
++                print(f"[web-keys] subscribed to redis channel '{channel}' on {redis_host}:{redis_port}", flush=True)
++                for msg in pubsub.listen():
++                    if msg.get("type") != "message":
++                        continue
++                    data = msg.get("data")
++                    if not data:
++                        continue
++                    try:
++                        event, token = pickle.loads(data)
++                    except Exception as e:
++                        print(f"[web-keys] bad payload: {e}", flush=True)
++                        continue
++                    token = str(token).lower()
++                    if event == "press":
++                        kb._handle_press_token(token, source="web")
++                    elif event == "release":
++                        kb._handle_release_token(token, source="web")
++            except Exception as e:
++                print(f"[web-keys] subscriber error: {e}; reconnecting in 1s", flush=True)
++                time.sleep(1.0)
++
++    t = threading.Thread(target=_run, name="web-keys-subscriber", daemon=True)
++    t.start()
++    return t
++
++
+ def run(args: argparse.Namespace) -> None:
+     replay_events: list[KeyboardReplayEvent] | None = None
+     if args.replay_ops_file is not None:
+@@ -2170,7 +2212,7 @@ def run(args: argparse.Namespace) -> None:
+             f"[replay] loaded {len(replay_events)} keyboard operations from {Path(args.replay_ops_file).expanduser().resolve()}",
+             flush=True,
+         )
+-    if pynput_keyboard is None and replay_events is None:
++    if pynput_keyboard is None and replay_events is None and not bool(getattr(args, "web_keys", False)):
+         raise SystemExit(
+             "Missing dependency 'pynput'. Install it in your env with: pip install pynput"
+         )
+@@ -2199,6 +2241,13 @@ def run(args: argparse.Namespace) -> None:
+         replay_events=replay_events,
+         replay_speed=float(args.replay_speed),
+     )
++    if bool(getattr(args, "web_keys", False)):
++        _start_web_key_subscriber(
++            kb,
++            redis_host=str(args.redis_ip),
++            redis_port=int(args.redis_port),
++            channel=str(args.web_keys_channel),
++        )
+     contact_resolver = ContactLabelResolver.disabled()
+     redis_client: redis.Redis | None = None
+     channels: dict[str, str] | None = None
+@@ -2372,6 +2421,18 @@ def parse_args() -> argparse.Namespace:
+     )
+     parser.add_argument("--redis-ip", type=str, default="localhost", help="Redis host for server mode.")
+     parser.add_argument("--redis-port", type=int, default=6379, help="Redis port for server mode.")
++    parser.add_argument(
++        "--web-keys",
++        action=argparse.BooleanOptionalAction,
++        default=True,
++        help="Subscribe to Redis 'web_keys' channel and forward press/release events into the keyboard state machine.",
++    )
++    parser.add_argument(
++        "--web-keys-channel",
++        type=str,
++        default="web_keys",
++        help="Redis pub/sub channel for web-driven key events.",
++    )
+     parser.add_argument("--lower-cmd-channel", type=str, default="lower_cmd", help="Redis channel for lower command.")
+     parser.add_argument("--vr-pos-channel", type=str, default="vr_3point_pos_l", help="Redis channel for local VR 3-point positions.")
+     parser.add_argument("--vr-orn-channel", type=str, default="vr_3point_orn_l", help="Redis channel for local VR 3-point orientations.")

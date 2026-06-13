@@ -1,0 +1,44 @@
+# node / vite
+mujoco_wasm/node_modules/
+mujoco_wasm/.vite/
+
+# vite production builds (these are huge and reproducible)
+mujoco_wasm/dist/
+mujoco_wasm/dist-desktop/
+mujoco_wasm/dist-mobile/
+
+# generated browser assets (built by tools/build_browser_assets.py — large
+# binaries that don't belong in git)
+mujoco_wasm/public/scenebot/policy.onnx
+mujoco_wasm/public/scenebot/clips.bin
+mujoco_wasm/public/scenebot/clips_index.json
+mujoco_wasm/public/scenebot/contact_labels.bin
+mujoco_wasm/public/scenebot/contact_labels_index.json
+mujoco_wasm/public/scenebot/motion_graph.json
+mujoco_wasm/public/scenebot/policy_meta.json
+mujoco_wasm/public/scenebot/scene_29dof_flat_hand.xml
+mujoco_wasm/public/scenebot/assets/
+
+# server-mode runtime artifacts (server/run_all.sh stages these from the
+# adjacent tml_humanoid_deploy clone)
+mujoco_wasm/public/scene_29dof_flat_hand.xml
+mujoco_wasm/public/assets/
+mujoco_wasm/public/meshes
+mujoco_wasm/public/meshes/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# editor / OS
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# logs / scratch from server scripts
+/tmp/scenebot/
+*.log
