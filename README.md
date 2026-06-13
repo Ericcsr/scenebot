@@ -1,25 +1,42 @@
 # scenebot — interactive web demo
 
-Browser demo for the scenebot G1 humanoid: MuJoCo physics in WASM, Three.js
-rendering, ONNX streaming policy + motion graph driving the robot.
+Browser demo for the scenebot G1 humanoid: each visitor clicks **Start Demo**,
+the server spawns a private MuJoCo simulation for them, and the browser
+renders it live over a WebSocket. Press W/A/S/D/G/L/etc. to drive the robot.
 
-Two run modes share one frontend:
+Three modes share one frontend, gated by `<body data-mode>` in the HTML:
 
-| Mode | When | What runs |
-| --- | --- | --- |
-| **Server-authoritative** (default for now) | colleague debugging, native MuJoCo viewer side-by-side comparison | sim+policy+motion graph on the server, browser is a thin renderer over a WebSocket |
-| **Full browser** (experimental) | future public deploy, no server | each browser tab runs its own sim, policy, and motion graph in JS |
+| Mode | URL | Topology | When |
+| --- | --- | --- | --- |
+| **spawn** (default) | `/` | each browser tab → private (controller, motion_graph) on the server | how you'd actually deploy this; matches OmniReset's per-user model |
+| **ws-debug** | `/index-debug.html` | one shared sim, all visitors see the same robot | comparing the WASM viewport vs. native MuJoCo viewer |
+| **fullbrowser** (experimental) | `/index-fullbrowser.html` | sim+policy+motion graph all run client-side in JS, no server | future zero-cost public deploy; parity tests under `mujoco_wasm/test/` |
 
-Pick one and follow the matching section below. The "Local first run" walkthrough
-is the server-authoritative mode — that's what's been smoke-tested end-to-end.
+The "Local first run" walkthrough below sets up **spawn mode** end-to-end.
+The other two share the same setup and are explained in shorter sections at
+the bottom.
 
 ---
 
-## Local first run (server-authoritative mode)
+## Local first run (spawn mode)
 
-> **What you'll get:** controller + motion graph running locally; a browser tab
-> at `http://localhost:5173/index-debug.html` showing the robot driven by the
-> server, plus an optional native MuJoCo viewer window if you have a display.
+> **What you'll get:** the spawn server, ws bridge, and Vite dev server all
+> running on your machine; opening `http://localhost:5173/` shows a
+> Start button; clicking it boots a private sim and connects you to it.
+
+### Layout
+
+The launcher expects three sibling clones:
+
+```
+~/scenebot-deploy/
+├── scenebot/                       (this repo — frontend, launcher, patches)
+├── tml_humanoid_deploy/            (Ericcsr/tml_humanoid_deploy + scenebot patch)
+└── robot_motion_stitching/         (Ericcsr/robot_motion_stitching + scenebot patch)
+```
+
+Override locations with `TML_DIR=` / `RMS_DIR=` env vars if you place them
+elsewhere.
 
 ### 1. Clone three repos side-by-side
 
@@ -109,35 +126,40 @@ npm install
 
 ```bash
 cd ~/scenebot-deploy/scenebot
-./server/run_all.sh
+./server/run_spawn.sh
 ```
 
-This boots redis, the controller, the motion graph, the WebSocket bridge, and
-finally the Vite dev server in the foreground. `Ctrl-C` on the foreground
-process stops everything.
+This boots redis, `spawn_server.py` (port 8000), `ws_bridge.py` (port 8765),
+then the Vite dev server (port 5173) in the foreground. `Ctrl-C` on the
+foreground process stops everything (and reaps any spawned per-session
+controllers).
 
-If `$DISPLAY` is set when you run the launcher (i.e. you're on a desktop or
-inside a remote VS Code session with X forwarding), you'll also get a native
-MuJoCo viewer window for ground-truth comparison. Force it off with
-`NO_VIEWER=1 ./server/run_all.sh`.
+Caps to know:
+
+- `SCENEBOT_MAX_SESSIONS=3` (override via env). The 4th concurrent visitor gets
+  HTTP 503 and an in-page "server is full" message.
+- A session is auto-terminated after 60 s of no `/health` polling (covers
+  browser crashes that didn't fire `beforeunload`).
 
 ### 7. Open the browser
 
 Visit:
 
 ```
-http://localhost:5173/index-debug.html
+http://localhost:5173/
 ```
 
-You should see the G1 standing in a small terrain scene. Press `W` to walk,
-`Q`/`E` to spin, etc. Full key map below.
+You should see a "Start Demo" overlay. Click it; the server spawns your
+private sim (~10–15 s on a CPU-only box). When the first frame arrives the
+overlay hides and the robot appears. Press `W` to walk, `Q`/`E` to spin,
+etc. Full key map below.
 
 If the browser is on a different machine from the launcher (e.g. you SSH'd
-into a lab box), tunnel both ports:
+into a lab box), tunnel **three** ports:
 
 ```bash
-ssh -L 5173:localhost:5173 -L 8765:localhost:8765 <user>@<host>
-# then on your laptop: http://localhost:5173/index-debug.html
+ssh -L 5173:localhost:5173 -L 8765:localhost:8765 -L 8000:localhost:8000 <user>@<host>
+# then on your laptop: http://localhost:5173/
 ```
 
 ### Keyboard
@@ -163,25 +185,40 @@ finishes. There's an example sequence in WORKING notes:
 
 ---
 
+## Shared-sim debug mode (route ws-debug)
+
+> **What you'll get:** one shared sim that every visitor sees the same view
+> of. Useful for visually comparing the WASM viewport against the native
+> MuJoCo viewer running on the same box.
+
+```bash
+./server/run_all.sh
+# open http://localhost:5173/index-debug.html
+```
+
+If `$DISPLAY` is set on the launcher's shell (a desktop session, or remote
+SSH with X forwarding), `run_all.sh` also opens a native MuJoCo viewer
+window for ground-truth comparison. Force it off with
+`NO_VIEWER=1 ./server/run_all.sh`.
+
 ## Full-browser mode (experimental)
 
 > **What you'll get:** every visitor's tab is fully self-contained — sim,
-> policy, motion graph all run client-side in JS. No server. This mirrors the
-> public-deploy target but is still in development.
+> policy, motion graph all run client-side in JS. No server. This is the
+> end-state for a public, zero-cost deploy but parity with the Python
+> reference is still being audited (see `mujoco_wasm/test/`).
 
 ```bash
-# Build the browser-loadable asset bundle (one-time, after step 3 of the
-# server-authoritative walkthrough; the controller's HEADLESS_AUTO=1 dump of
-# /tmp/web_scene.xml is required).
-HEADLESS_AUTO=1 ./server/run_all.sh   # let it boot, Ctrl-C after you see "render Hz"
+# One-time: build the asset bundle the JS modules read at boot.
+# Requires running run_spawn.sh or run_all.sh once first so the controller
+# dumps /tmp/web_scene.xml. Ctrl-C after that, then:
 python tools/build_browser_assets.py
 
-# then start vite alone
+# start the frontend alone
 ./server/run_browser.sh
 ```
 
-Open: `http://localhost:5173/`  (no `index-debug.html` suffix; default route
-is full-browser when `data-mode` is absent.)
+Open: `http://localhost:5173/index-fullbrowser.html`.
 
 ---
 
@@ -192,18 +229,22 @@ scenebot/                          (this repo)
 ├── README.md                       you are here
 ├── index.html, demo.html, ...      academic landing page (Bulma) — kept from upstream
 ├── mujoco_wasm/                    Vite frontend project
-│   ├── index.html                    full-browser entry (no data-mode)
-│   ├── index-debug.html              server-authoritative entry (data-mode="ws-debug")
+│   ├── index.html                    spawn-mode entry (data-mode="spawn", default)
+│   ├── index-debug.html              shared-sim debug entry (data-mode="ws-debug")
+│   ├── index-fullbrowser.html        full-browser experimental entry (no data-mode)
 │   ├── src/main.js                   shared frontend; reads data-mode + ?backend=
-│   ├── src/wsClient.js               WebSocket client used by the debug entry
+│   ├── src/wsClient.js               WebSocket client (used by spawn + ws-debug modes)
+│   ├── src/spawnClient.js            HTTP client for spawn_server (POST/DELETE/GET)
 │   ├── src/scenebot/                 full-browser modules (motion graph, policy, loader, kbd)
 │   ├── public/scenebot/              (gitignored — build_browser_assets.py output)
-│   └── public/{scene_..xml,meshes/}  (gitignored — server mode stages from tml_humanoid_deploy)
-├── server/                         backend launchers + WS bridge
-│   ├── run_all.sh                    boots redis + controller + motion_graph + bridge + vite
-│   ├── run_browser.sh                vite-only (full-browser mode)
-│   ├── ws_bridge.py                  asyncio Redis ↔ WebSocket
-│   └── requirements.txt              websockets>=12.0
+│   └── public/{scene_..xml,meshes/}  (gitignored — ws-debug mode stages from tml_humanoid_deploy)
+├── server/                         backend launchers + spawn server + WS bridge
+│   ├── run_spawn.sh                  spawn-mode launcher: redis + spawn_server + ws_bridge + vite
+│   ├── run_all.sh                    shared-sim debug launcher
+│   ├── run_browser.sh                full-browser launcher (vite only)
+│   ├── spawn_server.py               aiohttp on :8000; per-user sim spawn/kill
+│   ├── ws_bridge.py                  asyncio Redis ↔ WebSocket; routes by /<session_id>
+│   └── requirements.txt              websockets>=12.0, aiohttp>=3.9.0, pynput, pyyaml
 ├── patches/                        small patches applied to upstream repos
 │   ├── tml_humanoid_deploy.patch     thread caps + render_state SET + HEADLESS_AUTO + scene dump
 │   └── robot_motion_stitching.patch  --web-keys flag + redis web_keys subscriber
@@ -282,13 +323,18 @@ channel `web_keys`, which `run_motion_graph.py --web-keys` subscribes to.
 
 ## Status & known gaps
 
-- ✅ Server-authoritative mode boots end-to-end on a Linux box, ~3 CPU cores
-  per sim, 44 Hz steady frame rate.
-- ⚠️ Currently a **single shared sim** — multi-user demos are not isolated.
-  Public deploy needs per-WS-connection sim spawning; not implemented yet.
-- ⚠️ Full-browser mode is wired up but parity tests against the Python
+- ✅ **Spawn mode** end-to-end on a single host: each browser tab gets its own
+  (controller, motion_graph) pair, ~3 CPU cores per sim, 44 Hz steady frame
+  rate, ~10–15 s cold start. Concurrent sessions verified.
+- ✅ Shared-sim **ws-debug mode** still works for native-viewer parity checks.
+- ⚠️ **No production deploy story yet** (Docker image, nginx + TLS, RunPod
+  template, public hostname routing, auth). Spawn server on port 8000 is
+  unauthenticated — any visitor on the network can spawn a session.
+- ⚠️ **Full-browser mode** is wired up but parity tests against the Python
   reference are still ongoing (see `mujoco_wasm/test/`).
-- ⚠️ No production deploy story (Docker image, nginx + WSS, RunPod template, …)
-  — the current setup expects a developer running the launcher locally.
+- ⚠️ **No warm pool**: each Start click takes ~10-15 s. OmniReset's similar
+  demo likely uses a warm pool to mask this; we don't yet.
+- ⚠️ Browser ↔ spawn_server uses `http://` (not https) and `ws://` (not wss);
+  fine for localhost but a public deploy will need a reverse proxy with TLS.
 
 For questions, ping Zhen Wu (zhenwu@stanford.edu).
