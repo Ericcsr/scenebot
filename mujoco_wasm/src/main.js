@@ -6,6 +6,12 @@ import { DragStateManager } from './utils/DragStateManager.js';
 import { setupGUI, downloadExampleScenesFolder, loadSceneFromURL, drawTendonsAndFlex, getPosition, getQuaternion, toMujocoPos, standardNormal } from './mujocoUtils.js';
 import { PolicyController } from './policy/policyController.js';
 import { WSClient, WebKeyboardHandler } from './wsClient.js';
+import { awaitStartFlow, captureStartClick } from './spawnClient.js';
+
+// Wire up the Start button click listener immediately at module load. Without
+// this, init() takes ~500-1000ms to async-load the scene XML/meshes/policy,
+// and a user who clicks Start during that window would have their click lost.
+captureStartClick();
 import   load_mujoco        from 'mujoco-js/dist/mujoco_wasm.js';
 import { loadScenebotAssets, hideDebugGeoms } from './scenebot/loader.js';
 import { MotionGraphRuntime, qposFromRuntimePose } from './scenebot/motion_graph_runtime.js';
@@ -438,17 +444,24 @@ export class MuJoCoDemo {
   }
 
   async init() {
-    // Route selection: <body data-mode="ws-debug"> opts in to the WS-debug entry
-    // (route A — server is authoritative, browser only renders qpos). The default
-    // entry (data-mode unset or "browser") runs sim+policy+motion-graph entirely
-    // client-side via the modules under src/scenebot/.
+    // Route selection driven by <body data-mode>:
+    //   data-mode="spawn"      → POST /sessions, wait for ready, connect to per-user ws
+    //                            (this is what index.html / the public demo serves)
+    //   data-mode="ws-debug"   → connect to a fixed shared-sim ws (run_all.sh debug)
+    //   absent / "browser"     → full-browser: sim + policy + motion graph in JS
     //
     // ?backend=ws://host:port still works: it overrides the WS URL when
     // data-mode="ws-debug", and is also a back-compat shortcut to force WS mode.
     const params = new URLSearchParams(window.location.search);
     const backendUrl = params.get("backend");
     const bodyMode = (document.body && document.body.dataset.mode) || "";
-    this.runMode = (bodyMode === "ws-debug" || backendUrl) ? "ws" : "browser";
+    if (bodyMode === "spawn") {
+      this.runMode = "spawn";
+    } else if (bodyMode === "ws-debug" || backendUrl) {
+      this.runMode = "ws";
+    } else {
+      this.runMode = "browser";
+    }
     this.backendUrl = backendUrl || "ws://" + location.hostname + ":8765";
     console.log(`[scenebot] runMode=${this.runMode}` + (this.runMode === "ws" ? ` backend=${this.backendUrl}` : ""));
 
@@ -478,7 +491,28 @@ export class MuJoCoDemo {
       console.warn("[scene] could not resolve free_box qpos addr:", err);
     }
 
-    if (this.runMode === "ws") {
+    if (this.runMode === "spawn") {
+      // Wait for the user to click Start. captureStartClick() at module-load
+      // time already wired the listener, so a click during init's async
+      // bootstrapping is latched.
+      const overlay = document.getElementById("startOverlay");
+      const { wsUrl } = await awaitStartFlow();
+      console.log("[scene] spawn-mode connecting to", wsUrl);
+      this.ws = new WSClient(wsUrl);
+      this.webKeys = new WebKeyboardHandler(this.ws);
+      // Hide the overlay once the first WS frame arrives, not before — that
+      // way users don't see a blank scene if the WS handshake fails.
+      const hideOnFrame = () => {
+        if (this.ws && this.ws.latestQpos && overlay) {
+          overlay.style.display = "none";
+          return true;
+        }
+        return false;
+      };
+      const overlayHider = setInterval(() => {
+        if (hideOnFrame()) clearInterval(overlayHider);
+      }, 100);
+    } else if (this.runMode === "ws") {
       console.log("[scene] connecting to", this.backendUrl);
       this.ws = new WSClient(this.backendUrl);
       this.webKeys = new WebKeyboardHandler(this.ws);

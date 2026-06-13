@@ -321,13 +321,35 @@ class SpawnServer:
         return web.json_response({"ok": True, "active": len(self.sessions), "max": self.max_sessions})
 
 
+@web.middleware
+async def cors_middleware(request: web.Request, handler):
+    """Allow any origin to call this server. Permissive on purpose: this is a
+    localhost dev/demo service, the user already runs the bridge themselves.
+    For a real deploy lock down ALLOWED_ORIGINS."""
+    if request.method == "OPTIONS":
+        # Preflight short-circuit.
+        resp = web.Response(status=204)
+    else:
+        try:
+            resp = await handler(request)
+        except web.HTTPException as e:
+            resp = e
+    resp.headers.setdefault("Access-Control-Allow-Origin", "*")
+    resp.headers.setdefault("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+    resp.headers.setdefault("Access-Control-Allow-Headers", "Content-Type")
+    resp.headers.setdefault("Access-Control-Max-Age", "600")
+    return resp
+
+
 def _build_app(server: SpawnServer) -> web.Application:
-    app = web.Application()
+    app = web.Application(middlewares=[cors_middleware])
     app.router.add_post("/sessions", server.post_sessions)
     app.router.add_delete("/sessions/{sid}", server.delete_session)
     app.router.add_get("/sessions/{sid}/health", server.get_session_health)
     app.router.add_get("/sessions", server.list_sessions)
     app.router.add_get("/healthz", server.healthz)
+    # OPTIONS catch-all for preflight (matches anything not already routed above).
+    app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response(status=204))
     return app
 
 

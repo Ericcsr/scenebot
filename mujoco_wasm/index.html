@@ -1,30 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>MuJoCo Demo</title>
+        <title>scenebot</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-        <meta name="application-name"   content="mujoco_wasm">
-        <meta name="description"        content="MuJoCo Testbed">
-        <meta name="keywords"           content="MuJoCo">
-        <meta name="author"             content="zalo">
+        <meta name="application-name"   content="scenebot">
+        <meta name="description"        content="Per-user scenebot demo: click Start, server spawns a sim, browser renders it.">
         <meta name="viewport"           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no, shrink-to-fit=0">
-        <meta name="theme-color"        content="#ffffff">
+        <meta name="theme-color"        content="#0f172a">
         <link rel ="icon" type="image/x-icon" href="./assets/favicon.png">
+        <style>
+          html, body { height: 100%; margin: 0; }
+          body {
+            background-color: rgb(255, 255, 255);
+            overflow: hidden;
+            position: fixed;
+            min-height: 100%;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+          }
+          #startOverlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.4rem;
+            z-index: 9999;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          }
+          #startOverlay h1 {
+            margin: 0;
+            font-size: 2.4rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+          }
+          #startOverlay p {
+            margin: 0;
+            opacity: 0.8;
+            max-width: 32em;
+            text-align: center;
+            line-height: 1.5;
+          }
+          #startBtn {
+            padding: 0.9rem 2.4rem;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #0f172a;
+            background: #fbbf24;
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.1s;
+            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.3);
+          }
+          #startBtn:hover { background: #f59e0b; transform: translateY(-1px); }
+          #startBtn:active { transform: translateY(0); }
+          #startBtn[disabled] { background: #475569; color: #cbd5e1; cursor: wait; box-shadow: none; }
+          #spawnStatus {
+            font-size: 0.95rem;
+            opacity: 0.75;
+            min-height: 1.4em;
+            font-variant-numeric: tabular-nums;
+          }
+          .spawn-spinner {
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 3px solid rgba(255, 255, 255, 0.18);
+            border-top-color: #fbbf24;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+          @keyframes spin { to { transform: rotate(360deg); } }
+          #spawnError {
+            color: #fca5a5;
+            font-size: 0.95rem;
+            max-width: 32em;
+            text-align: center;
+            min-height: 1.4em;
+          }
+        </style>
     </head>
 
-    <body style="margin:0px; background-color:rgb(255, 255, 255); overflow:hidden; position:fixed; min-height: 100%;
-                 touch-action: none;
-                 -webkit-touch-callout: none; /* iOS Safari */
-                 -webkit-user-select: none; /* Safari */
-                 -khtml-user-select: none; /* Konqueror HTML */
-                 -moz-user-select: none; /* Old versions of Firefox */
-                 -ms-user-select: none; /* Internet Explorer/Edge */
-                 user-select: none; /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */">
-        <h1 hidden></h1> <!-- Puts the Lighthouse Score over 90 heheh-->
+    <!-- data-mode="spawn" routes main.js to the per-user POST /sessions flow. -->
+    <body data-mode="spawn">
+        <h1 hidden>scenebot</h1>
+
+        <!-- Pre-app overlay: shown until the user clicks Start AND a session is ready. -->
+        <div id="startOverlay">
+            <h1>scenebot</h1>
+            <p>Click Start to spawn a private MuJoCo simulation on the server. It takes ~10 seconds to boot, then the robot will appear and you can drive it with W/A/S/D/G/L/etc.</p>
+            <button id="startBtn" type="button">Start Demo</button>
+            <div class="spawn-spinner" id="spawnSpinner" hidden></div>
+            <div id="spawnStatus"></div>
+            <div id="spawnError"></div>
+        </div>
 
         <div id="appbody" style="position: absolute;">
-            <!--<div id="error"></div>
-            <script type="module" src="./src/Debug.js"></script>-->
             <script type="module" src="./src/main.js"></script>
         </div>
     </body>
