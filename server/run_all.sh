@@ -190,7 +190,12 @@ for pid in "${PIDS[@]}"; do
     ps -p "$pid" -o pid,cmd= 2>/dev/null || echo "  (PID $pid already exited)"
 done
 
+cd "$SCENEBOT_DIR/mujoco_wasm"
+if [ ! -d node_modules ]; then
+    echo "[run_all] running npm install (first run; this can take a minute)..."
+    npm install --no-audit --no-fund
+fi
+
 echo "[run_all] launching Vite dev server (foreground; Ctrl-C to stop everything)..."
 echo "[run_all]   open http://<host>:5173/index-debug.html"
-cd "$SCENEBOT_DIR/mujoco_wasm"
 exec npm run dev -- --host
