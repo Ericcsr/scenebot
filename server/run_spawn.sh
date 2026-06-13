@@ -89,6 +89,53 @@ if ! redis-cli ping >/dev/null 2>&1; then
 fi
 redis-cli ping >/dev/null
 
+# Pre-stage the scene XML + meshes so vite can serve them to the browser.
+# spawn_server's per-session controllers each dump /tmp/web_scene.xml on boot,
+# but the frontend loads BEFORE any session exists — it needs the merged scene
+# (terrain boxes + free box injected) ready at vite startup.
+PUBLIC_DIR="$SCENEBOT_DIR/mujoco_wasm/public"
+if [ ! -f "$PUBLIC_DIR/scene_29dof_flat_hand.xml" ]; then
+    echo "[run_spawn] pre-staging scene XML by running a one-shot controller (~10s)..."
+    rm -f /tmp/web_scene.xml
+    (cd "$TML_DIR" && \
+     HEADLESS_AUTO=1 NO_VIEWER=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+        OPENBLAS_NUM_THREADS=1 ORT_INTRA_OP_NUM_THREADS=2 \
+        xvfb-run -a python run_controller.py \
+        --config exported_policies/scenebot/experiment_streaming.yaml \
+        --use_sim </dev/null >"$LOG_DIR/prestage.log" 2>&1) &
+    PRESTAGE_PID=$!
+    for _ in $(seq 1 200); do
+        [ -f /tmp/web_scene.xml ] && break
+        sleep 0.1
+    done
+    # Kill the one-shot controller and its children — we just needed the XML dump.
+    kill -KILL "$PRESTAGE_PID" 2>/dev/null || true
+    pkill -KILL -P "$PRESTAGE_PID" 2>/dev/null || true
+    pkill -KILL -f "run_controller.py.*scenebot.*--use_sim$" 2>/dev/null || true
+    sleep 1
+    # Wipe leaked SHM from the one-shot.
+    python - <<'PY' 2>/dev/null || true
+from multiprocessing.shared_memory import SharedMemory
+for n in ("control","q","dq","omega","imu_quat","root_pos","root_vel","torso_pos","torso_orn"):
+    try: s=SharedMemory(name=n); s.close(); s.unlink()
+    except FileNotFoundError: pass
+PY
+    if [ ! -f /tmp/web_scene.xml ]; then
+        echo "[run_spawn] WARNING: pre-stage controller didn't dump /tmp/web_scene.xml" >&2
+        echo "[run_spawn]   browser scene may not load. Check $LOG_DIR/prestage.log" >&2
+    else
+        mkdir -p "$PUBLIC_DIR/assets/g1"
+        cp /tmp/web_scene.xml "$PUBLIC_DIR/scene_29dof_flat_hand.xml"
+        # Stage the included g1 XML (referenced by <include file="assets/g1/g1_29dof_flat_hand.xml"/>).
+        cp "$TML_DIR/assets/g1/g1_29dof_flat_hand.xml" "$PUBLIC_DIR/assets/g1/g1_29dof_flat_hand.xml"
+        # The included XML's meshdir="assets/g1/meshes" — symlink that AND a top-level
+        # /meshes/ for any path the loader might try.
+        ln -sfn "$TML_DIR/assets/g1/meshes" "$PUBLIC_DIR/assets/g1/meshes"
+        ln -sfn "$TML_DIR/assets/g1/meshes" "$PUBLIC_DIR/meshes"
+        echo "[run_spawn] staged scene XML + included XML + meshes into $PUBLIC_DIR"
+    fi
+fi
+
 echo "[run_spawn] starting spawn_server.py on :8000 (max=${SCENEBOT_MAX_SESSIONS:-3})..."
 (python "$SERVER_DIR/spawn_server.py" </dev/null >"$LOG_DIR/spawn_server.log" 2>&1) &
 PIDS+=($!)
