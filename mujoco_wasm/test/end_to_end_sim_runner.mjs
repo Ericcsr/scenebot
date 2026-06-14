@@ -142,10 +142,17 @@ console.log("[node-sim] loading policy ONNX (via onnxruntime-node)...");
 // onnxruntime-node directly instead, then pass it to the PolicyRuntime constructor.
 // Existing policy_action_parity.test.js does exactly this. The numeric output is
 // identical (both ort backends share the same C++ kernels).
+//
+// Force single-thread sequential execution to eliminate parallel-reduce
+// non-determinism. Python's controller can be matched with the same env vars
+// (OMP_NUM_THREADS=1 + ort.SessionOptions intra=1).
 const onnxBytes = await readFile(`${PUB}/policy.onnx`);
 const ortSession = await ortNode.InferenceSession.create(onnxBytes, {
   executionProviders: ["cpu"],
   graphOptimizationLevel: "all",
+  intraOpNumThreads: 1,
+  interOpNumThreads: 1,
+  executionMode: "sequential",
 });
 const policy = new PolicyRuntime(ortSession, policyMeta);
 // PolicyRuntime.getAction expects a Tensor with `new ort.Tensor(...)`-shape; in

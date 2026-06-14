@@ -10,7 +10,7 @@ Three modes share one frontend, gated by `<body data-mode>` in the HTML:
 | --- | --- | --- | --- |
 | **spawn** (default) | `/` | each browser tab → private (controller, motion_graph) on the server | how you'd actually deploy this; matches OmniReset's per-user model |
 | **ws-debug** | `/index-debug.html` | one shared sim, all visitors see the same robot | comparing the WASM viewport vs. native MuJoCo viewer |
-| **fullbrowser** (experimental) | `/index-fullbrowser.html` | sim+policy+motion graph all run client-side in JS, no server | future zero-cost public deploy; parity tests under `mujoco_wasm/test/` |
+| **fullbrowser** | `/index-fullbrowser.html` | sim+policy+motion graph all run client-side in JS, no server | zero-cost public deploy; numerically bit-exact vs Python (see `mujoco_wasm/test/` and `tools/replay_golden_python.py`) |
 
 The "Local first run" walkthrough below sets up **spawn mode** end-to-end.
 The other two share the same setup and are explained in shorter sections at
@@ -201,12 +201,16 @@ SSH with X forwarding), `run_all.sh` also opens a native MuJoCo viewer
 window for ground-truth comparison. Force it off with
 `NO_VIEWER=1 ./server/run_all.sh`.
 
-## Full-browser mode (experimental)
+## Full-browser mode
 
 > **What you'll get:** every visitor's tab is fully self-contained — sim,
 > policy, motion graph all run client-side in JS. No server. This is the
-> end-state for a public, zero-cost deploy but parity with the Python
-> reference is still being audited (see `mujoco_wasm/test/`).
+> end-state for a public, zero-cost deploy. Numerically aligned with the
+> Python reference to the IEEE-754 noise floor (~1e-8 max abs diff at tick 0;
+> ~1 mm root drift over 18 s of chaotic dynamics). Verified by tick-aligned
+> offline replay — see `mujoco_wasm/test/replay_golden_node.mjs` and
+> `tools/replay_golden_python.py`, both driven by the same pre-recorded
+> golden stream packets.
 
 ```bash
 # One-time: build the asset bundle the JS modules read at boot.
@@ -231,7 +235,7 @@ scenebot/                          (this repo)
 ├── mujoco_wasm/                    Vite frontend project
 │   ├── index.html                    spawn-mode entry (data-mode="spawn", default)
 │   ├── index-debug.html              shared-sim debug entry (data-mode="ws-debug")
-│   ├── index-fullbrowser.html        full-browser experimental entry (no data-mode)
+│   ├── index-fullbrowser.html        full-browser entry (no data-mode)
 │   ├── src/main.js                   shared frontend; reads data-mode + ?backend=
 │   ├── src/wsClient.js               WebSocket client (used by spawn + ws-debug modes)
 │   ├── src/spawnClient.js            HTTP client for spawn_server (POST/DELETE/GET)
@@ -330,8 +334,10 @@ channel `web_keys`, which `run_motion_graph.py --web-keys` subscribes to.
 - ⚠️ **No production deploy story yet** (Docker image, nginx + TLS, RunPod
   template, public hostname routing, auth). Spawn server on port 8000 is
   unauthenticated — any visitor on the network can spawn a session.
-- ⚠️ **Full-browser mode** is wired up but parity tests against the Python
-  reference are still ongoing (see `mujoco_wasm/test/`).
+- ✅ **Full-browser mode** runs end-to-end and matches the Python reference
+  to the IEEE-754 noise floor. Tick 0 max abs diff ~1e-8; root drift ~1 mm
+  over 18 s of chaotic dynamics. Verified via tick-aligned offline replay
+  (`tools/replay_golden_python.py` + `mujoco_wasm/test/replay_golden_node.mjs`).
 - ⚠️ **No warm pool**: each Start click takes ~10-15 s. OmniReset's similar
   demo likely uses a warm pool to mask this; we don't yet.
 - ⚠️ Browser ↔ spawn_server uses `http://` (not https) and `ws://` (not wss);
