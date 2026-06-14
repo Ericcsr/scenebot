@@ -1,0 +1,85 @@
+{
+  "0": {
+    "dim": 4,
+    "n_frames": 229,
+    "name": "AMASS_g1_GMR8_ACCAD_Male2Walking_c3d_B4_-_Stand_to_Walk_backwards_stageii.contact.npy",
+    "offset": 0,
+    "present": true
+  },
+  "1": {
+    "dim": 4,
+    "n_frames": 252,
+    "name": "AMASS_g1_GMR8_KIT_3_walking_slow01_stageii.contact.npy",
+    "offset": 916,
+    "present": true
+  },
+  "10": {
+    "dim": 4,
+    "n_frames": 434,
+    "name": "stair_aligned_walk0.7s_motion.contact.npy",
+    "offset": 9107,
+    "present": true
+  },
+  "11": {
+    "dim": 4,
+    "n_frames": 302,
+    "name": "stitched_motion.contact.npy",
+    "offset": 10843,
+    "present": true
+  },
+  "2": {
+    "dim": 4,
+    "n_frames": 259,
+    "name": "AMASS_g1_GMR8_KIT_4_WalkingStraightBackwards01_stageii.contact.npy",
+    "offset": 1924,
+    "present": true
+  },
+  "3": {
+    "dim": 4,
+    "n_frames": 155,
+    "name": "AMASS_g1_GMR8_KIT_4_WalkingStraightForward01_stageii.contact.npy",
+    "offset": 2960,
+    "present": true
+  },
+  "4": {
+    "dim": 4,
+    "n_frames": 364,
+    "name": "AMASS_g1_GMR8_KIT_7_WalkInClockwiseCircle01_stageii.contact.npy",
+    "offset": 3580,
+    "present": true
+  },
+  "5": {
+    "dim": 4,
+    "n_frames": 310,
+    "name": "AMASS_g1_GMR8_KIT_7_WalkInCounterClockwiseCircle01_stageii.contact.npy",
+    "offset": 5036,
+    "present": true
+  },
+  "6": {
+    "dim": 10,
+    "n_frames": 0,
+    "offset": 0,
+    "present": false
+  },
+  "7": {
+    "dim": 4,
+    "n_frames": 298,
+    "name": "come_down_50cm_box_R_001__A045_M_motion_0.contact.npy",
+    "offset": 6276,
+    "present": true
+  },
+  "8": {
+    "dim": 4,
+    "n_frames": 141,
+    "name": "come_up_50cm_box_R_001__A471.contact.npy",
+    "offset": 7468,
+    "present": true
+  },
+  "9": {
+    "dim": 5,
+    "n_frames": 215,
+    "name": "neutral_sit_on_chair_start_R_001__A542_M_motion_0_contact_labels.npy",
+    "offset": 8032,
+    "present": true
+  }
+}

@@ -6,7 +6,12 @@
 
 import { ClipBundle, ContactLabels } from "./motion_clips.js";
 
-const BASE = "/scenebot";
+// Vite sets BASE_URL to "/" in dev (vite serve) and "./" in production builds
+// (because vite.config.* sets base: './'). Both work as fetch path prefixes —
+// "/scenebot/..." resolves at the dev-server root; "./scenebot/..." resolves
+// relative to the iframe's HTML document, which is what we want for the Pages
+// build at .../mujoco_wasm/dist-desktop/index.html.
+const BASE = `${import.meta.env.BASE_URL}scenebot`.replace(/\/+/g, "/").replace(/\/$/, "");
 
 export async function loadScenebotAssets({ onProgress } = {}) {
   const status = (msg) => onProgress?.(msg);

@@ -30,8 +30,13 @@ mujoco.FS.mount(mujoco.MEMFS, { root: '.' }, '/working');
 
 // Stage the merged scene XML, the included g1 XML, and every <mesh file="..."/>
 // referenced by the included XML into Emscripten's MEMFS so MuJoCo's loader can
-// resolve relative paths. Vite serves the launcher-copied files at site root.
-async function stageSceneIntoMemfs(rootScene) {
+// resolve relative paths. The `prefix` arg controls where to fetch from:
+//   - ws-debug / spawn dev: "/" — files served at site root by run_all.sh /
+//     run_spawn.sh, which symlink public/scene_*.xml + public/assets/g1/.
+//   - browser (production Pages build): `${BASE_URL}scenebot/` — Vite copied
+//     public/scenebot/ flat into dist-desktop/scenebot/, so the iframe at
+//     dist-desktop/index.html fetches "./scenebot/scene_*.xml" etc.
+async function stageSceneIntoMemfs(rootScene, prefix = "/") {
   const fetchText = async (path) => {
     const r = await fetch(path);
     if (!r.ok) throw new Error(`fetch ${path} failed: ${r.status}`);
@@ -52,7 +57,7 @@ async function stageSceneIntoMemfs(rootScene) {
   };
 
   // 1. Root scene XML.
-  const rootXml = await fetchText("/" + rootScene);
+  const rootXml = await fetchText(prefix + rootScene);
   mujoco.FS.writeFile("/working/" + rootScene, rootXml);
 
   // 2. Find any <include file="..."/> children referenced by the root scene and stage them.
@@ -65,7 +70,7 @@ async function stageSceneIntoMemfs(rootScene) {
   // 3. For each included XML, fetch + write, and harvest meshdir + <mesh file="..."/>.
   const meshDirByInclude = new Map();
   for (const inc of includedFiles) {
-    const incXml = await fetchText("/" + inc);
+    const incXml = await fetchText(prefix + inc);
     ensureDir(inc);
     mujoco.FS.writeFile("/working/" + inc, incXml);
     const compMatch = incXml.match(/<compiler[^>]*meshdir="([^"]+)"[^>]*\/?>/);
@@ -86,13 +91,11 @@ async function stageSceneIntoMemfs(rootScene) {
       const relInside = meshDir ? `${meshDir.replace(/\/$/, "")}/${meshFile}` : meshFile;
       const memfsPath = relInside.replace(/^\.\//, "");
       ensureDir(memfsPath);
-      const bytes = await fetchBin("/" + memfsPath);
+      const bytes = await fetchBin(prefix + memfsPath);
       mujoco.FS.writeFile("/working/" + memfsPath, bytes);
     }
   }
 }
-
-await stageSceneIntoMemfs(initialScene);
 
 export class MuJoCoDemo {
   constructor() {
@@ -464,6 +467,16 @@ export class MuJoCoDemo {
     }
     this.backendUrl = backendUrl || "ws://" + location.hostname + ":8765";
     console.log(`[scenebot] runMode=${this.runMode}` + (this.runMode === "ws" ? ` backend=${this.backendUrl}` : ""));
+
+    // Stage scene XML + meshes into MEMFS. Where to fetch them depends on
+    // runMode (see stageSceneIntoMemfs comment for the rationale):
+    //   browser → import.meta.env.BASE_URL + "scenebot/" so the production
+    //             build at dist-desktop/index.html can fetch "./scenebot/...".
+    //   ws / spawn → "/" because the launchers symlink the assets at site root.
+    const stagePrefix = this.runMode === "browser"
+      ? `${import.meta.env.BASE_URL}scenebot/`.replace(/\/+/g, "/")
+      : "/";
+    await stageSceneIntoMemfs(initialScene, stagePrefix);
 
     // Download the the examples to MuJoCo's virtual file system
     await downloadExampleScenesFolder(mujoco);

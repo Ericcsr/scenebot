@@ -1,0 +1,122 @@
+{
+  "0": {
+    "body_count": 30,
+    "body_pos_w_off": 13282,
+    "body_quat_w_off": 33892,
+    "joint_dim": 29,
+    "joint_pos_off": 0,
+    "joint_vel_off": 6641,
+    "n_frames": 229,
+    "name": "AMASS_g1_GMR8_ACCAD_Male2Walking_c3d_B4_-_Stand_to_Walk_backwards_stageii.npz"
+  },
+  "1": {
+    "body_count": 30,
+    "body_pos_w_off": 75988,
+    "body_quat_w_off": 98668,
+    "joint_dim": 29,
+    "joint_pos_off": 61372,
+    "joint_vel_off": 68680,
+    "n_frames": 252,
+    "name": "AMASS_g1_GMR8_KIT_3_walking_slow01_stageii.npz"
+  },
+  "10": {
+    "body_count": 30,
+    "body_pos_w_off": 749576,
+    "body_quat_w_off": 788636,
+    "joint_dim": 29,
+    "joint_pos_off": 724404,
+    "joint_vel_off": 736990,
+    "n_frames": 434,
+    "name": "stair_aligned_walk0.7s_motion.npz"
+  },
+  "11": {
+    "body_count": 30,
+    "body_pos_w_off": 858232,
+    "body_quat_w_off": 885412,
+    "joint_dim": 29,
+    "joint_pos_off": 840716,
+    "joint_vel_off": 849474,
+    "n_frames": 302,
+    "name": "stitched_motion.npz"
+  },
+  "2": {
+    "body_count": 30,
+    "body_pos_w_off": 143930,
+    "body_quat_w_off": 167240,
+    "joint_dim": 29,
+    "joint_pos_off": 128908,
+    "joint_vel_off": 136419,
+    "n_frames": 259,
+    "name": "AMASS_g1_GMR8_KIT_4_WalkingStraightBackwards01_stageii.npz"
+  },
+  "3": {
+    "body_count": 30,
+    "body_pos_w_off": 207310,
+    "body_quat_w_off": 221260,
+    "joint_dim": 29,
+    "joint_pos_off": 198320,
+    "joint_vel_off": 202815,
+    "n_frames": 155,
+    "name": "AMASS_g1_GMR8_KIT_4_WalkingStraightForward01_stageii.npz"
+  },
+  "4": {
+    "body_count": 30,
+    "body_pos_w_off": 260972,
+    "body_quat_w_off": 293732,
+    "joint_dim": 29,
+    "joint_pos_off": 239860,
+    "joint_vel_off": 250416,
+    "n_frames": 364,
+    "name": "AMASS_g1_GMR8_KIT_7_WalkInClockwiseCircle01_stageii.npz"
+  },
+  "5": {
+    "body_count": 30,
+    "body_pos_w_off": 355392,
+    "body_quat_w_off": 383292,
+    "joint_dim": 29,
+    "joint_pos_off": 337412,
+    "joint_vel_off": 346402,
+    "n_frames": 310,
+    "name": "AMASS_g1_GMR8_KIT_7_WalkInCounterClockwiseCircle01_stageii.npz"
+  },
+  "6": {
+    "body_count": 30,
+    "body_pos_w_off": 448448,
+    "body_quat_w_off": 491828,
+    "joint_dim": 29,
+    "joint_pos_off": 420492,
+    "joint_vel_off": 434470,
+    "n_frames": 482,
+    "name": "AMASS_g1_GMR8_Transitions_mazen_c3d_kick_walk_stageii.npz"
+  },
+  "7": {
+    "body_count": 30,
+    "body_pos_w_off": 566894,
+    "body_quat_w_off": 593624,
+    "joint_dim": 29,
+    "joint_pos_off": 549668,
+    "joint_vel_off": 558281,
+    "n_frames": 297,
+    "name": "come_down_50cm_box_R_001__A045_M_motion_0.npz"
+  },
+  "8": {
+    "body_count": 30,
+    "body_pos_w_off": 637442,
+    "body_quat_w_off": 650132,
+    "joint_dim": 29,
+    "joint_pos_off": 629264,
+    "joint_vel_off": 633353,
+    "n_frames": 141,
+    "name": "come_up_50cm_box_R_001__A471.npz"
+  },
+  "9": {
+    "body_count": 30,
+    "body_pos_w_off": 679464,
+    "body_quat_w_off": 698724,
+    "joint_dim": 29,
+    "joint_pos_off": 667052,
+    "joint_vel_off": 673258,
+    "n_frames": 214,
+    "name": "neutral_sit_on_chair_start_R_001__A542_M_motion_0.npz"
+  }
+}

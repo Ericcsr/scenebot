@@ -11,7 +11,8 @@
     "build": "esbuild ./src/main.js --bundle --sourcemap --format=esm --outdir=./build --platform=node",
     "build:web": "vite build",
     "build:web:desktop": "VITE_DEPTH_PREVIEW_SCALE=4 VITE_GUI_MODE=open vite build --outDir dist-desktop",
-    "build:web:mobile": "VITE_DEPTH_PREVIEW_SCALE=1 VITE_GUI_MODE=hide vite build --outDir dist-mobile"
+    "build:web:mobile": "VITE_DEPTH_PREVIEW_SCALE=1 VITE_GUI_MODE=hide vite build --outDir dist-mobile",
+    "build:web:fullbrowser": "vite build --config vite.config.fullbrowser.js && mv dist-desktop/index-fullbrowser.html dist-desktop/index.html && cp -r public/scenebot dist-desktop/"
   },
   "repository": {
     "type": "git",

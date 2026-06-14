@@ -1,0 +1,276 @@
+{
+  "edge_segments": {
+    "Backward->Backward": {
+      "clip_idx": 2,
+      "dst_command": "Backward",
+      "edge_key": "Backward->Backward",
+      "end_frame": 151,
+      "score": 0.6178052366020883,
+      "src_command": "Backward",
+      "start_frame": 78
+    },
+    "Backward->Stop": {
+      "clip_idx": 2,
+      "dst_command": "Stop",
+      "edge_key": "Backward->Stop",
+      "end_frame": 220,
+      "score": 1.1353770892493564,
+      "src_command": "Backward",
+      "start_frame": 152
+    },
+    "ClimbStair->ClimbStair": {
+      "clip_idx": 10,
+      "dst_command": "ClimbStair",
+      "edge_key": "ClimbStair->ClimbStair",
+      "end_frame": 299,
+      "score": 1.572762943560955,
+      "src_command": "ClimbStair",
+      "start_frame": 150
+    },
+    "ClimbStair->Stop": {
+      "clip_idx": 10,
+      "dst_command": "Stop",
+      "edge_key": "ClimbStair->Stop",
+      "end_frame": 395,
+      "score": 1.7791512066644533,
+      "src_command": "ClimbStair",
+      "start_frame": 300
+    },
+    "ComeDownBox->ComeDownBox": {
+      "clip_idx": 7,
+      "dst_command": "ComeDownBox",
+      "edge_key": "ComeDownBox->ComeDownBox",
+      "end_frame": 141,
+      "score": 0.8603284494906664,
+      "src_command": "ComeDownBox",
+      "start_frame": 44
+    },
+    "ComeDownBox->Stop": {
+      "clip_idx": 7,
+      "dst_command": "Stop",
+      "edge_key": "ComeDownBox->Stop",
+      "end_frame": 160,
+      "score": 1.4141138173062633,
+      "src_command": "ComeDownBox",
+      "start_frame": 140
+    },
+    "Forward->Forward": {
+      "clip_idx": 1,
+      "dst_command": "Forward",
+      "edge_key": "Forward->Forward",
+      "end_frame": 170,
+      "score": 0.4542790190229968,
+      "src_command": "Forward",
+      "start_frame": 89
+    },
+    "Forward->Stop": {
+      "clip_idx": 1,
+      "dst_command": "Stop",
+      "edge_key": "Forward->Stop",
+      "end_frame": 251,
+      "score": 1.0077021096726542,
+      "src_command": "Forward",
+      "start_frame": 172
+    },
+    "ForwardTurnLeft->ForwardTurnLeft": {
+      "clip_idx": 5,
+      "dst_command": "ForwardTurnLeft",
+      "edge_key": "ForwardTurnLeft->ForwardTurnLeft",
+      "end_frame": 122,
+      "score": 0.6277304178395353,
+      "src_command": "ForwardTurnLeft",
+      "start_frame": 69
+    },
+    "ForwardTurnLeft->Stop": {
+      "clip_idx": 5,
+      "dst_command": "Stop",
+      "edge_key": "ForwardTurnLeft->Stop",
+      "end_frame": 309,
+      "score": 0.9773023035914317,
+      "src_command": "ForwardTurnLeft",
+      "start_frame": 232
+    },
+    "ForwardTurnRight->ForwardTurnRight": {
+      "clip_idx": 4,
+      "dst_command": "ForwardTurnRight",
+      "edge_key": "ForwardTurnRight->ForwardTurnRight",
+      "end_frame": 237,
+      "score": 0.6251136608235628,
+      "src_command": "ForwardTurnRight",
+      "start_frame": 180
+    },
+    "ForwardTurnRight->Stop": {
+      "clip_idx": 4,
+      "dst_command": "Stop",
+      "edge_key": "ForwardTurnRight->Stop",
+      "end_frame": 330,
+      "score": 0.9470546954629082,
+      "src_command": "ForwardTurnRight",
+      "start_frame": 236
+    },
+    "Kick->Kick": {
+      "clip_idx": 6,
+      "dst_command": "Kick",
+      "edge_key": "Kick->Kick",
+      "end_frame": 197,
+      "score": 1.5828880916903023,
+      "src_command": "Kick",
+      "start_frame": 48
+    },
+    "Kick->Stop": {
+      "clip_idx": 6,
+      "dst_command": "Stop",
+      "edge_key": "Kick->Stop",
+      "end_frame": 210,
+      "score": 1.8882242301339063,
+      "src_command": "Kick",
+      "start_frame": 201
+    },
+    "PickUpBox->Stop": {
+      "clip_idx": 11,
+      "dst_command": "Stop",
+      "edge_key": "PickUpBox->Stop",
+      "end_frame": 120,
+      "score": 0.0,
+      "src_command": "PickUpBox",
+      "start_frame": 120
+    },
+    "SitDown->Stop": {
+      "clip_idx": 9,
+      "dst_command": "Stop",
+      "edge_key": "SitDown->Stop",
+      "end_frame": 213,
+      "score": 0.0,
+      "src_command": "SitDown",
+      "start_frame": 213
+    },
+    "StepOnBox->StepOnBox": {
+      "clip_idx": 8,
+      "dst_command": "StepOnBox",
+      "edge_key": "StepOnBox->StepOnBox",
+      "end_frame": 107,
+      "score": 1.2078451721959176,
+      "src_command": "StepOnBox",
+      "start_frame": 10
+    },
+    "StepOnBox->Stop": {
+      "clip_idx": 8,
+      "dst_command": "Stop",
+      "edge_key": "StepOnBox->Stop",
+      "end_frame": 135,
+      "score": 0.9957012928558668,
+      "src_command": "StepOnBox",
+      "start_frame": 108
+    },
+    "Stop->Backward": {
+      "clip_idx": 2,
+      "dst_command": "Backward",
+      "edge_key": "Stop->Backward",
+      "end_frame": 79,
+      "score": 0.8750934373304883,
+      "src_command": "Stop",
+      "start_frame": 30
+    },
+    "Stop->ClimbStair": {
+      "clip_idx": 10,
+      "dst_command": "ClimbStair",
+      "edge_key": "Stop->ClimbStair",
+      "end_frame": 149,
+      "score": 1.6232508063979552,
+      "src_command": "Stop",
+      "start_frame": 100
+    },
+    "Stop->ComeDownBox": {
+      "clip_idx": 7,
+      "dst_command": "ComeDownBox",
+      "edge_key": "Stop->ComeDownBox",
+      "end_frame": 137,
+      "score": 1.212191710628239,
+      "src_command": "Stop",
+      "start_frame": 40
+    },
+    "Stop->Forward": {
+      "clip_idx": 1,
+      "dst_command": "Forward",
+      "edge_key": "Stop->Forward",
+      "end_frame": 89,
+      "score": 1.2494155995267782,
+      "src_command": "Stop",
+      "start_frame": 0
+    },
+    "Stop->ForwardTurnLeft": {
+      "clip_idx": 5,
+      "dst_command": "ForwardTurnLeft",
+      "edge_key": "Stop->ForwardTurnLeft",
+      "end_frame": 69,
+      "score": 1.1907272218965295,
+      "src_command": "Stop",
+      "start_frame": 0
+    },
+    "Stop->ForwardTurnRight": {
+      "clip_idx": 4,
+      "dst_command": "ForwardTurnRight",
+      "edge_key": "Stop->ForwardTurnRight",
+      "end_frame": 69,
+      "score": 0.8481500378647924,
+      "src_command": "Stop",
+      "start_frame": 0
+    },
+    "Stop->Kick": {
+      "clip_idx": 6,
+      "dst_command": "Kick",
+      "edge_key": "Stop->Kick",
+      "end_frame": 49,
+      "score": 1.8350653825721353,
+      "src_command": "Stop",
+      "start_frame": 40
+    },
+    "Stop->PickUpBox": {
+      "clip_idx": 11,
+      "dst_command": "PickUpBox",
+      "edge_key": "Stop->PickUpBox",
+      "end_frame": 120,
+      "score": 0.0,
+      "src_command": "Stop",
+      "start_frame": 0
+    },
+    "Stop->SitDown": {
+      "clip_idx": 9,
+      "dst_command": "SitDown",
+      "edge_key": "Stop->SitDown",
+      "end_frame": 213,
+      "score": 0.0,
+      "src_command": "Stop",
+      "start_frame": 0
+    },
+    "Stop->StepOnBox": {
+      "clip_idx": 8,
+      "dst_command": "StepOnBox",
+      "edge_key": "Stop->StepOnBox",
+      "end_frame": 107,
+      "score": 1.3401638868271195,
+      "src_command": "Stop",
+      "start_frame": 10
+    }
+  },
+  "fps": 50.0,
+  "non_recurring_appendix": [
+    {
+      "clip_idx": 11,
+      "command": "PickUpBox",
+      "end_bound": 120,
+      "letter": "G",
+      "mode": "between",
+      "start_bound": 0
+    },
+    {
+      "clip_idx": 9,
+      "command": "SitDown",
+      "end_bound": 213,
+      "letter": "L",
+      "mode": "between",
+      "start_bound": 0
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,35 @@
+<mujoco model="g1_29dof scene">
+  <include file="assets/g1/g1_29dof_flat_hand.xml"/>
+
+  <statistic center="0 0 0.5" extent="2.0"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="-130" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+      markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    
+    
+    <body name="free_box" pos="1.75 0.05 0.51" quat="1 0 0 0">
+      <freejoint name="free_box_joint"/>
+      <geom name="free_box_geom" type="box" pos="0 0 0" size="0.15 0.1 0.15" mass="0.1" contype="1" conaffinity="1" rgba="0.65 0.45 0.35 1.0"/>
+    </body>
+    <body name="step_1" pos="1.85 0.0 0.18" quat="1.0 0.0 0.0 0.0">
+      <geom name="step_1_geom" type="box" pos="0 0 0" size="0.61 0.61 0.18" contype="1" conaffinity="1" rgba="0.55 0.52 0.48 1.0"/>
+    </body>
+    <body name="step_2" pos="-0.8 0.0 0.21" quat="1.0 0.0 0.0 0.0">
+      <geom name="step_2_geom" type="box" pos="0 0 0" size="0.2 0.4 0.21" contype="1" conaffinity="1" rgba="0.55 0.52 0.48 1.0"/>
+    </body>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+  </worldbody>
+</mujoco>
