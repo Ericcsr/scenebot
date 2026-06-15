@@ -2,9 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="description" content="Chaining Dynamic Human Skills via Motion Matching">
+  <meta name="description" content="SceneBot: Contact-Prompted General Humanoid Whole Body Tracking with Scene-Interaction">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Perceptive Humanoid Parkour</title>
+  <title>SceneBot: Contact-Prompted General Humanoid Whole Body Tracking with Scene-Interaction</title>
 
   <link rel="stylesheet" href="./static/css/bulma.min.css">
   <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
@@ -55,11 +55,8 @@
   
   <div class="hero-body">
     <div class="container has-text-centered">
-      <h1 class="title is-1 publication-title is-size-1-mobile" style="font-size: 5rem; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);">
-        Perceptive Humanoid Parkour
-      </h1>
-      <h1 class="subtitle is-1 publication-title is-size-4-mobile" style="font-size: 3.5rem; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);">
-        Chaining Dynamic Human Skills via Motion Matching
+      <h1 class="title is-1 publication-title is-size-3-desktop" style="font-size: clamp(1.75rem, 3.2vw, 3.25rem); line-height: 1.15; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8); max-width: 1200px; margin-left: auto; margin-right: auto;">
+        SceneBot: Contact-Prompted General Humanoid Whole Body Tracking with Scene-Interaction
       </h1>
       <!-- <p style="font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);">
         <a target="_blank" href="https://zhenwu061.github.io/">Zhen Wu<sup>*</sup></a><sup>1</sup>, 
@@ -239,10 +236,10 @@
   <div class="container">
     <h2 class="title is-2" style="text-align: center; margin-bottom: 2rem;">Interactive Demo</h2>
     <p class="has-text-centered" style="font-size: 1.2rem; margin-bottom: 1rem; color: #666;">
-      Explore the PHP policy in a real-time MuJoCo simulation running fully in your browser.
+      Control a G1 humanoid in a real-time MuJoCo simulation running fully in your browser.
     </p>
     <p class="has-text-centered" style="font-size: 1.0rem; margin-bottom: 2rem; color: #666;">
-      The demo may take a few seconds to load as models and assets are streamed.
+      The demo may take a few seconds to load as models and assets are streamed. For the best experience, use a laptop or desktop.
     </p>
     <div class="has-text-centered" style="margin-bottom: 2rem;">
       <a class="button is-link is-rounded" href="./demo.html">Open the interactive demo page</a>
@@ -250,10 +247,10 @@
     <div class="has-text-centered" style="margin-bottom: 1.5rem;">
       <div style="max-width: 900px; margin: 0 auto; background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border: 2px solid #e6c84c; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 2px 8px rgba(230, 200, 76, 0.25);">
         <p style="font-size: 1rem; line-height: 1.7; color: #333; margin: 0;">
-          <strong style="font-size: 1.05rem; color: #8b6914;">💡 Tips:</strong>
-          <br>1️⃣ To climb an obstacle: first align and run toward it, then keep holding <kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">W</kbd> during approach, climbing, on top, and descent, until you’re back on the ground.
-          <br>2️⃣ When running, tap <kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid #ddd;">A</kbd> / <kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid #ddd;">D</kbd> to align with the next obstacle, or press <kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid #ddd;">Y</kbd> to switch between low and high speed and find your rhythm!
-          <br>3️⃣ If the robot fails or drifts off course, hit the Reload button or press <kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid #ddd;">BACKSPACE</kbd> to restart a new run.
+          <strong style="font-size: 1.05rem; color: #8b6914;">💡 Tip:</strong>
+          Press the next key when the previous motion is finished.
+          <br><strong style="color: #8b6914;">Example sequence:</strong>
+          <kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">Q</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">L</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">L</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">E</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">W</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">N</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">G</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">W</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">Z</kbd>-<kbd style="background: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">P</kbd>
         </p>
       </div>
     </div>
@@ -265,32 +262,39 @@
             src="./mujoco_wasm/dist-desktop/index.html"
             loading="lazy"
             style="width: 100%; height: 600px; border: none;"
-            title="PHP MuJoCo Web Demo">
+            title="Scenebot MuJoCo Web Demo">
             Your browser does not support iframes.
           </iframe>
-          <div style="position: absolute; left: 50%; top: 6px; transform: translateX(-50%); width: calc(100% - 32px); max-width: 1100px; background: rgba(255, 243, 205, 0.96); padding: 0.65rem 1rem; border-radius: 999px; border: 1px solid #e6c84c; box-shadow: 0 6px 18px rgba(230, 200, 76, 0.28);">
-            <div style="font-size: 1.15rem; line-height: 1.45; color: #0f172a; text-align: center; white-space: normal;">
-              💡 <strong>Keep holding <kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">W</kbd> during approach, climbing, on top, and descent, until you’re back on the ground!</strong>            </div>
+          <div style="position: absolute; left: 50%; top: 6px; transform: translateX(-50%); width: calc(100% - 32px); max-width: 1100px; background: rgba(255, 243, 205, 0.96); padding: 0.65rem 1rem; border-radius: 14px; border: 1px solid #e6c84c; box-shadow: 0 6px 18px rgba(230, 200, 76, 0.28);">
+            <div style="font-size: 1rem; line-height: 1.45; color: #0f172a; text-align: center;">
+              💡 <strong>Press the next key when the previous motion is finished.</strong>
+              <div style="margin-top: 0.25rem; font-size: 0.95rem;">
+                Example:
+                <kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">Q</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">L</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">L</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">E</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">W</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">N</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">G</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">W</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">Z</kbd>-<kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">P</kbd>
+              </div>
+            </div>
           </div>
-          <div style="position: absolute; right: 16px; bottom: 16px; background: rgba(255, 255, 255, 0.92); padding: 1rem 1.25rem; border-radius: 10px; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14); max-width: 380px;">
+          <div style="position: absolute; right: 16px; bottom: 16px; background: rgba(255, 255, 255, 0.92); padding: 1rem 1.25rem; border-radius: 10px; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14); max-width: 520px;">
             <h3 class="title is-5" style="margin-bottom: 0.6rem; color: #333;">🎮 How to Play</h3>
             <div style="font-size: 0.9rem; line-height: 1.5; color: #444;">
               <div style="font-weight: 700; margin-bottom: 0.5rem;">Controls</div>
               <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.45rem 0.8rem; align-items: center;">
-                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">W</kbd>
-                <span>Move forward</span>
-                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">A</kbd>
-                <span>Turn left</span>
-                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">D</kbd>
-                <span>Turn right</span>
-                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">Climb</kbd>
-                <span>Autonomous when pressing <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">W</kbd></span>
-                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">Y</kbd>
-                <span>Toggle speed mode</span>
-                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">SPACE</kbd>
-                <span>Pause</span>
-                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">BACKSPACE</kbd>
-                <span>Reset run</span>
+                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">W A S D</kbd>
+                <span>Walk forward / back, turn left / right</span>
+                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">Q / E</kbd>
+                <span>Spin in place left / right</span>
+                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">N / Z</kbd>
+                <span>Step on box / come down</span>
+                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">G / P</kbd>
+                <span>Pick up / put down box</span>
+                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">L</kbd>
+                <span>Sit down / stand up (toggle)</span>
+                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">F</kbd>
+                <span>Freeze / unfreeze upper body</span>
+                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">Space</kbd>
+                <span>Hard stop</span>
+                <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">Backspace</kbd>
+                <span>Reset scene</span>
               </div>
             </div>
           </div>

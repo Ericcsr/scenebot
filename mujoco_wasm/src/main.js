@@ -617,7 +617,12 @@ export class MuJoCoDemo {
       mjStepIdx: 0,
     };
     this._perfDom = this._installPerfOverlay();
-    if ((import.meta.env.VITE_GUI_MODE || "open") === "hide") {
+    this.speedModeElement.style.display = 'none';
+    const guiModeBrowser = import.meta.env.VITE_GUI_MODE || 'open';
+    if (guiModeBrowser === 'open') {
+      this.speedControlsContainer.style.display = 'none';
+    }
+    if (guiModeBrowser === 'hide') {
       this._installKeyboardHintInSpeedPanel();
     }
     this._setupReferenceGhost();
@@ -908,7 +913,7 @@ export class MuJoCoDemo {
   }
 
   updateSpeedModeIndicator() {
-    if (!this.speedModeElement) {
+    if (!this.speedModeElement || this.runMode === 'browser') {
       return;
     }
     const isHighSpeed = this.policyController ? this.policyController.highSpeedMode !== false : true;
