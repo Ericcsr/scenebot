@@ -10,6 +10,7 @@ import * as ort from "onnxruntime-web";
 import {
   applyQuat, multQuat, invQuat, quatAsMatrix, wxyzToXyzw,
 } from "./quat_utils.js";
+import { normalizeContactForPolicy } from "./contact_utils.js";
 
 /**
  * @param {Float32Array} dst         output flat array
@@ -38,11 +39,12 @@ export class PolicyRuntime {
     this.actionScaleMujoco = Float32Array.from(meta.action_scale_mujoco);
     this.defaultQIsaac = Float32Array.from(meta.default_q_isaac);
 
-    // Default contact mask: filled at construction; mirrors the YAML default_contact_label.
+    // Default contact mask: expanded to policy contact_dim (e.g. 5-way -> 10-way).
     this.contactDim = meta.contact_dim;
-    const dc = meta.default_contact_label || [];
-    this.latestContactMask = new Float32Array(this.contactDim);
-    for (let i = 0; i < Math.min(dc.length, this.contactDim); i++) this.latestContactMask[i] = dc[i];
+    this.latestContactMask = normalizeContactForPolicy(
+      meta.default_contact_label || [],
+      meta,
+    );
 
     // Latest streaming inputs (defaults; over-written each tick from MotionGraphRuntime packet).
     this.latestLowerCmd = new Float32Array(meta.lower_cmd_dim);
@@ -63,6 +65,25 @@ export class PolicyRuntime {
     this._outputName = session?.outputNames?.[0] ?? "actions";
   }
 
+  reset() {
+    this.lastAction.fill(0);
+    this.latestLowerCmd.fill(0);
+    this.latestVrPos.fill(0);
+    this.latestVrOrn.fill(0);
+    this.latestVrOrn[0] = 1;
+    this.latestVrOrn[4] = 1;
+    this.latestVrOrn[8] = 1;
+    this.latestMotionAnchorPosW.fill(0);
+    this.latestMotionAnchorOrnW[0] = 0;
+    this.latestMotionAnchorOrnW[1] = 0;
+    this.latestMotionAnchorOrnW[2] = 0;
+    this.latestMotionAnchorOrnW[3] = 1;
+    this.latestContactMask = normalizeContactForPolicy(
+      this.meta.default_contact_label || [],
+      this.meta,
+    );
+  }
+
   static async create(modelUrl, meta) {
     // Point ort-web at jsdelivr for its .wasm backend files (Vite dev/prod don't auto-bundle them).
     // Mirrors what scenebot/mujoco_wasm/src/policy/policyController.js does.
@@ -81,10 +102,7 @@ export class PolicyRuntime {
     if (packet.vr_3point_pos_l) this.latestVrPos = packet.vr_3point_pos_l;
     if (packet.vr_3point_orn_l) this.latestVrOrn = packet.vr_3point_orn_l;
     if (packet.contact_mask) {
-      // Pad/truncate to contactDim.
-      const n = Math.min(packet.contact_mask.length, this.contactDim);
-      for (let i = 0; i < n; i++) this.latestContactMask[i] = packet.contact_mask[i];
-      for (let i = n; i < this.contactDim; i++) this.latestContactMask[i] = 0;
+      this.latestContactMask = normalizeContactForPolicy(packet.contact_mask, this.meta);
     }
     if (packet.motion_anchor_pos_w) {
       this.latestMotionAnchorPosW[0] = packet.motion_anchor_pos_w[0];

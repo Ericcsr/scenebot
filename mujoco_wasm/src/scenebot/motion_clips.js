@@ -121,6 +121,15 @@ export class ContactLabels {
     const e = this._index[String(clipIdx)];
     return e?.dim ?? 0;
   }
+
+  /** Max channel width across packaged clip labels (mirrors ContactLabelResolver.contact_dim). */
+  maxStreamDim() {
+    let maxDim = 4;
+    for (const e of Object.values(this._index)) {
+      if (e?.present && Number(e.dim) > maxDim) maxDim = Number(e.dim);
+    }
+    return maxDim;
+  }
 }
 
 function clampFrame(frameIdx, nFrames) {

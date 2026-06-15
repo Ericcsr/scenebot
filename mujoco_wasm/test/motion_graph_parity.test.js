@@ -92,7 +92,7 @@ describe("Phase A: motion graph numeric parity vs Python", () => {
     const kb = new KeyboardCommandState({ idleToStopS: 0.25 });
     const mg = new MotionGraphRuntime(motionGraph, clipBundle, contactLabels, {
       fps,
-      contactDim: golden.contact_mask.shape[1],
+      streamContactDim: golden.contact_mask.shape[1],
       defaultContactLabel: new Array(golden.contact_mask.shape[1]).fill(0),
       contactLabelsMnOnly: true,
       pickupForwardStepScale: pickupScale,

@@ -3,6 +3,8 @@
 //     [root_pos(3), root_quat_wxyz(4), joint_pos(29), free_box_pos(3), free_box_quat_wxyz(4)]
 // - Sends keyboard events as JSON: {type: "keydown"|"keyup", token: "w"|...}.
 
+import { DISABLED_KEY_TOKENS } from "./scenebot/keyboard_state.js";
+
 export class WSClient {
   /**
    * @param {string} url e.g. `ws://${location.hostname}:8765`
@@ -125,7 +127,8 @@ export class WebKeyboardHandler {
     if (this._shouldIgnore(ev)) return null;
     const k = String(ev.key || "").toLowerCase();
     const tok = KEY_TOKEN_MAP[k];
-    return tok || null;
+    if (!tok || DISABLED_KEY_TOKENS.has(tok)) return null;
+    return tok;
   }
 
   _onDown(ev) {

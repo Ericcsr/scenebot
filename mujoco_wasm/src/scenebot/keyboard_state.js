@@ -18,14 +18,17 @@ const MOVING_COMMANDS = new Set([
 
 const ISAAC_UPPER_BODY_INDICES = [12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28];
 
+/** Motion-graph keys ignored by the scenebot web demo (no climb-stair in this scene). */
+export const DISABLED_KEY_TOKENS = new Set(["m"]);
+
 // DOM key → token map. Lowercase. Letters are passed through; special-case Space/Ctrl.
 function domKeyToToken(ev) {
   const k = String(ev.key || "").toLowerCase();
   if (k === " " || k === "spacebar") return "space";
   if (k === "control") return "ctrl";
   if (/^[a-z]$/.test(k)) {
-    // Filter to the set the Python code accepts.
-    if ("wasdmnzgpklqef".includes(k)) return k;
+    // Filter to the set the Python code accepts (minus scenebot-disabled keys).
+    if ("wasdnzgpklqef".includes(k) && !DISABLED_KEY_TOKENS.has(k)) return k;
     return null;
   }
   return null;
@@ -39,7 +42,10 @@ export class KeyboardCommandState {
     this._idle_to_stop_s = options.idleToStopS ?? 0.25;
     this._last_motion_ts = _now();
     this._last_non_stop_command = COMMAND_STOP;
-    this._enabled_commands = new Set(options.enabledCommands || [...MOVING_COMMANDS, COMMAND_STOP]);
+    this._enabled_commands = new Set(
+      options.enabledCommands ||
+      [...MOVING_COMMANDS, COMMAND_STOP].filter((c) => c !== COMMAND_CLIMB_STAIR),
+    );
     // Ctrl-hold mode for W/S: run motion only while held, then snap to the X->Stop end pose.
     this._ctrl_pressed = false;
     this._ctrl_motion_keys = new Set();
@@ -66,6 +72,25 @@ export class KeyboardCommandState {
   // ────────────────────────────────────────────
   // DOM hookup
   // ────────────────────────────────────────────
+
+  reset() {
+    this._pressed.clear();
+    this._last_motion_ts = _now();
+    this._last_non_stop_command = COMMAND_STOP;
+    this._ctrl_pressed = false;
+    this._ctrl_motion_keys.clear();
+    this._ctrl_skip_request = null;
+    this._tap_command_request = null;
+    this._sit_toggle_request = null;
+    this._sit_toggle_forward_next = true;
+    this._sit_key_down = false;
+    this._q_key_down = false;
+    this._e_key_down = false;
+    this._yaw_turn_remaining_rad = 0.0;
+    this._freeze_frame_active = false;
+    this._freeze_toggle_edge = false;
+    this.clearUpperBodyFreezeSnapshot();
+  }
 
   attachDom() {
     if (!this._element) return;
@@ -141,7 +166,7 @@ export class KeyboardCommandState {
       this._last_motion_ts = _now();
       return;
     }
-    if ("wasdmnzgpk".includes(token)) {
+    if ("wasdnzgpk".includes(token)) {
       this._pressed.add(token);
       this._last_motion_ts = _now();
       this._tap_command_request = tokenToCommand[token];
@@ -168,7 +193,7 @@ export class KeyboardCommandState {
     if (token === "q") { this._q_key_down = false; return; }
     if (token === "e") { this._e_key_down = false; return; }
     if (token === "l") { this._sit_key_down = false; return; }
-    if ("wasdmnzgpk".includes(token)) {
+    if ("wasdnzgpk".includes(token)) {
       this._pressed.delete(token);
       if (this._ctrl_motion_keys.has(token)) {
         this._ctrl_motion_keys.delete(token);
@@ -191,7 +216,6 @@ export class KeyboardCommandState {
       return tap;
     }
     const order = [
-      ["m", COMMAND_CLIMB_STAIR],
       ["n", COMMAND_STEP_ON_BOX],
       ["z", COMMAND_COME_DOWN_BOX],
       ["g", COMMAND_PICK_UP_BOX],
@@ -247,6 +271,11 @@ export class KeyboardCommandState {
   }
 
   upperBodyFreezeEnabled() { return this._freeze_frame_active; }
+
+  /** Enable freeze without requiring an F keypress (e.g. after pick-up completes). */
+  activateUpperBodyFreeze() {
+    this._freeze_frame_active = true;
+  }
 
   // Snapshot management used by the freeze-frame overlay.
   setUpperBodyFreezeSnapshot(jointPos, contactMask, vrPosL, vrOrnL) {

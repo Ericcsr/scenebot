@@ -130,7 +130,7 @@ const labelsBin = await readFile(`${PUB}/contact_labels.bin`);
 const contactLabels = new ContactLabels(labelsBin.buffer.slice(labelsBin.byteOffset, labelsBin.byteOffset + labelsBin.byteLength), labelsIndex);
 const motionGraph = new MotionGraphRuntime(motionGraphJson, clipBundle, contactLabels, {
   fps: 1.0 / policyDt,
-  contactDim: policyMeta.contact_dim,
+  streamContactDim: contactLabels.maxStreamDim(),
   defaultContactLabel: policyMeta.default_contact_label,
   contactLabelsMnOnly: true,
   pickupForwardStepScale: 0.5,
@@ -209,6 +209,10 @@ for (let tick = 0; tick < N_TICKS; tick++) {
   const dyaw = kb.pollYawAdjustment(policyDt, yawRate);
 
   const packet = motionGraph.step(latched, ctrlSkipCmd, dyaw);
+  if (packet.pickup_forward_completed && !kb.upperBodyFreezeEnabled()) {
+    kb.activateUpperBodyFreeze();
+    kb.setUpperBodyFreezeSnapshot(packet.joint_pos_isaac, packet.contact_mask, packet.vr_3point_pos_l, packet.vr_3point_orn_l);
+  }
   const freezeEv = kb.pollUpperBodyFreezeToggle();
   if (freezeEv === "enabled") {
     kb.setUpperBodyFreezeSnapshot(packet.joint_pos_isaac, packet.contact_mask, packet.vr_3point_pos_l, packet.vr_3point_orn_l);

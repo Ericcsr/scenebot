@@ -1,29 +1,36 @@
 import * as THREE from 'three';
 import { Reflector  } from './utils/Reflector.js';
 import { MuJoCoDemo } from './main.js';
+import { hideDebugGeoms } from './scenebot/loader.js';
+import { CONTROLS_EXAMPLE_SEQUENCE, CONTROLS_USAGE_PREAMBLE_LINES, KEYBOARD_CONTROLS_HINT_ROWS, SCENEBOT_PANEL_MIN_WIDTH } from './scenebot/controls_hint.js';
 
 export async function reloadFunc() {
-  // Save the robot's x,y position so it respawns where it fell.
-  const savedX = this.data ? this.data.qpos[0] : 0;
-  const savedY = this.data ? this.data.qpos[1] : 0;
+  // Parkour demo scenes respawn where the robot fell; scenebot full-browser resets to origin.
+  const preserveXY = this.runMode !== "browser";
+  const savedX = preserveXY && this.data ? this.data.qpos[0] : 0;
+  const savedY = preserveXY && this.data ? this.data.qpos[1] : 0;
 
   // Delete the old scene and load the new scene
   this.scene.remove(this.scene.getObjectByName("MuJoCo Root"));
   [this.model, this.data, this.bodies, this.lights] =
     await loadSceneFromURL(this.mujoco, this.params.scene, this);
+  hideDebugGeoms(this.scene);
   if (typeof this.applySceneInitialState === 'function') {
     this.applySceneInitialState({ resetData: false, rebindCameras: true });
   } else {
     this.mujoco.mj_forward(this.model, this.data);
   }
 
-  // Restore x,y position and re-run forward kinematics.
-  if (this.data) {
+  // Restore x,y position and re-run forward kinematics (parkour scenes only).
+  if (preserveXY && this.data) {
     this.data.qpos[0] = savedX;
     this.data.qpos[1] = savedY;
     this.mujoco.mj_forward(this.model, this.data);
   }
 
+  if (typeof this.onSceneReloaded === 'function') {
+    await this.onSceneReloaded();
+  }
   if (typeof this.rebuildPolicy === 'function') {
     await this.rebuildPolicy();
   }
@@ -182,6 +189,32 @@ export function setupGUI(parentContext) {
 
   // Toggle raw depth inset rendering.
   // simulationFolder.add(parentContext.params, 'showRawDepth').name('Show Raw Depth');
+
+  if (parentContext.runMode === "browser") {
+    parentContext.gui.domElement.style.width = SCENEBOT_PANEL_MIN_WIDTH;
+    parentContext.gui.domElement.style.maxWidth = "min(520px, calc(100vw - 32px))";
+
+    simulationFolder.add(parentContext.params, "showReferenceMotion")
+      .name("Show Reference Motion")
+      .onChange((value) => {
+        setReferenceGhostVisible(parentContext.refViz, value);
+      });
+    actionInnerHTML += 'Toggle reference motion<br>';
+    keyInnerHTML += 'GUI<br>';
+
+    const controlsFolder = simulationFolder.addFolder("Controls");
+    for (let i = 0; i < CONTROLS_USAGE_PREAMBLE_LINES.length; i++) {
+      const line = { label: CONTROLS_USAGE_PREAMBLE_LINES[i] };
+      controlsFolder.add(line, "label").name(i === 0 ? "Tip" : " ").disable();
+    }
+    controlsFolder.add({ label: "Example sequence:" }, "label").name("Example").disable();
+    controlsFolder.add({ label: CONTROLS_EXAMPLE_SEQUENCE }, "label").name(" ").disable();
+    for (const { keys, action } of KEYBOARD_CONTROLS_HINT_ROWS) {
+      const row = { label: `${keys} — ${action}` };
+      controlsFolder.add(row, "label").name(keys).disable();
+    }
+    controlsFolder.open();
+  }
 
   // Add reload model button.
   // Parameters:

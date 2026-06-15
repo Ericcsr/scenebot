@@ -13,6 +13,7 @@ import {
   applyQuat, multQuat, computeSe2AlignRoot, applySe2ToBody,
   wxyzToXyzw, xyzwToWxyz, headingFromQuatWxyz, quatFromYaw,
 } from "./quat_utils.js";
+import { padContactMaskToStreamDim } from "./contact_utils.js";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Constants (mirror motion_graph_engine.py / run_motion_graph.py)
@@ -473,7 +474,8 @@ export class MotionGraphRuntime {
    * @param {ContactLabels} contactLabels
    * @param {object} options
    * @param {number} options.fps        - control rate (fallback to db.fps)
-   * @param {number} options.contactDim - expected contact mask width (matches policy_meta.contact_dim)
+   * @param {number} options.streamContactDim - max label width published on the stream (usually 5)
+   * @param {number} options.contactDim       - deprecated alias for streamContactDim
    * @param {number[]} options.defaultContactLabel
    * @param {boolean} options.contactLabelsMnOnly
    * @param {number} options.pickupForwardStepScale
@@ -483,19 +485,28 @@ export class MotionGraphRuntime {
     this.clipBundle = clipBundle;
     this.contactLabels = contactLabels;
     this.fps = Number(options.fps || db.fps || 50.0);
-    this.contactDim = Number(options.contactDim || 4);
-    this.defaultContactLabel = Float32Array.from(options.defaultContactLabel || new Array(this.contactDim).fill(0));
+    this.streamContactDim = Number(
+      options.streamContactDim ?? options.contactDim ?? 4,
+    );
+    this.defaultContactLabel = padContactMaskToStreamDim(
+      options.defaultContactLabel || new Array(this.streamContactDim).fill(0),
+      this.streamContactDim,
+    );
     this.contactLabelsMnOnly = !!options.contactLabelsMnOnly;
     this.pickupForwardStepScale = Number(options.pickupForwardStepScale || 1.0);
     this.dt = 1.0 / this.fps;
+    this._bootstrapState();
+  }
 
-    // Initial bootstrap (mirrors run_motion_graph.py:1925-1949).
+  /** Re-run the initial edge/state bootstrap (constructor + reset). */
+  _bootstrapState() {
+    // Mirrors run_motion_graph.py:1925-1949.
     const initialEdgeKey = chooseInitialEdge(this.edgeMap, COMMAND_STOP);
     const initialEdge = this.edgeMap[initialEdgeKey];
     const initPlayDir = playbackDirectionForTransition(COMMAND_STOP, initialEdgeKey);
     this.state = _stateFromEdge(initialEdge, new Float64Array([0, 0, 0, 1]), new Float64Array(3), initPlayDir);
     this.state.frame_idx = this.state.segment_end_frame; // desired==Stop branch
-    const initClip = clipBundle.clip(this.state.clip_idx);
+    const initClip = this.clipBundle.clip(this.state.clip_idx);
     const initFrame = clampInt(this.state.frame_idx, 0, initClip.nFrames - 1);
     const bp = initClip.bodyPosAt(initFrame);
     const bq = initClip.bodyQuatAt(initFrame);
@@ -506,6 +517,10 @@ export class MotionGraphRuntime {
     const { rDelta, t } = computeSe2AlignRoot(initRootP, initRootQ, targetRootP, targetRootQ);
     this.state.rot = rDelta;
     this.state.trans = t;
+  }
+
+  reset() {
+    this._bootstrapState();
   }
 
   /** Mirror of _maybe_zero_contact_outside_mn (run_motion_graph.py:1455-1473). Under
@@ -553,17 +568,13 @@ export class MotionGraphRuntime {
       trans: Array.from(this.state.trans),
     };
 
-    // Contact label resolution.
+    // Contact label resolution (stream width matches Python ContactLabelResolver, not policy dim).
     let contactMask = this.defaultContactLabel;
     let isReal = false;
     if (this.contactLabels.hasClip(this.state.clip_idx)) {
       const labelView = this.contactLabels.atFrame(this.state.clip_idx, this.state.frame_idx);
       if (labelView) {
-        // Convert subview to a fresh Float32Array of contactDim length (pad/truncate).
-        const out = new Float32Array(this.contactDim);
-        const n = Math.min(labelView.length, this.contactDim);
-        for (let i = 0; i < n; i++) out[i] = labelView[i];
-        contactMask = out;
+        contactMask = padContactMaskToStreamDim(labelView, this.streamContactDim);
         isReal = true;
       }
     }
@@ -572,6 +583,8 @@ export class MotionGraphRuntime {
     const packet = _buildStreamPacket(
       clip, this.state.frame_idx, contactMask, pose.rootPosW, pose.rootQuatWxyz, this.state.playback_direction,
     );
+
+    const pickupForwardCompleted = isPickupForwardCompleted(stateAtPublish);
 
     // State transition (after publish, mirroring Python order).
     if (ctrlSkipCmd) {
@@ -595,8 +608,18 @@ export class MotionGraphRuntime {
       edge_key: stateAtPublish.edge_key,
       frame_idx: stateAtPublish.frame_idx,
       clip_idx: stateAtPublish.clip_idx,
+      pickup_forward_completed: pickupForwardCompleted,
     };
   }
+}
+
+/** True on the tick that publishes the final frame of forward PickUpBox (G). */
+export function isPickupForwardCompleted(stateAtPublish) {
+  return (
+    stateAtPublish.command === COMMAND_PICK_UP_BOX &&
+    stateAtPublish.playback_direction >= 0 &&
+    atSegmentEnd(stateAtPublish)
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────────────

@@ -17,6 +17,13 @@ import { loadScenebotAssets, hideDebugGeoms } from './scenebot/loader.js';
 import { MotionGraphRuntime, qposFromRuntimePose } from './scenebot/motion_graph_runtime.js';
 import { KeyboardCommandState } from './scenebot/keyboard_state.js';
 import { PolicyRuntime } from './scenebot/policy_runtime.js';
+import {
+  createReferenceGhost,
+  disposeReferenceGhost,
+  setReferenceGhostVisible,
+  syncReferenceGhost,
+} from './scenebot/reference_motion_viz.js';
+import { formatControlsHintPanel, SCENEBOT_PANEL_MIN_WIDTH } from './scenebot/controls_hint.js';
 
 // Load the MuJoCo Module
 const mujoco = await load_mujoco();
@@ -108,7 +115,7 @@ export class MuJoCoDemo {
     // Define Random State Variables
     // policyEnabled=false and paused=true: render() short-circuits the local physics + policy
     // pipeline. The WS-driven branch in render() supplies qpos and calls mj_forward instead.
-    this.params = { scene: initialScene, paused: true, help: false, ctrlnoiserate: 0.0, ctrlnoisestd: 0.0, keyframeNumber: 0, policyEnabled: false, showRawDepth: false };
+    this.params = { scene: initialScene, paused: true, help: false, ctrlnoiserate: 0.0, ctrlnoisestd: 0.0, keyframeNumber: 0, policyEnabled: false, showRawDepth: false, showReferenceMotion: true };
     this.mujoco_time = 0.0;
     this.bodies  = {}, this.lights = {};
     this.tmpVec  = new THREE.Vector3();
@@ -195,6 +202,25 @@ export class MuJoCoDemo {
 
       this.speedControlsContainer.appendChild(this.speedToggleButton);
       this.speedControlsContainer.appendChild(this.resetButton);
+
+      this.refMotionButton = document.createElement('button');
+      this.refMotionButton.type = 'button';
+      this.refMotionButton.textContent = 'Ref motion';
+      this.refMotionButton.style.padding = '8px 12px';
+      this.refMotionButton.style.borderRadius = '8px';
+      this.refMotionButton.style.border = 'none';
+      this.refMotionButton.style.background = 'rgba(0, 0, 0, 0.60)';
+      this.refMotionButton.style.color = '#ffffff';
+      this.refMotionButton.style.font = 'bold 14px Arial';
+      this.refMotionButton.style.letterSpacing = '0.2px';
+      this.refMotionButton.style.cursor = 'pointer';
+      this.refMotionButton.addEventListener('click', () => {
+        this.params.showReferenceMotion = !this.params.showReferenceMotion;
+        setReferenceGhostVisible(this.refViz, this.params.showReferenceMotion);
+        this.refMotionButton.style.opacity = this.params.showReferenceMotion ? '1' : '0.45';
+      });
+      this.refMotionButton.style.display = 'none';
+      this.speedControlsContainer.appendChild(this.refMotionButton);
     }
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Backspace') {
@@ -494,21 +520,7 @@ export class MuJoCoDemo {
     hideDebugGeoms(this.scene);
 
     // Resolve the qpos address of the dynamic free box (if it exists in the scene).
-    // mujoco-js exposes mj_name2id(model, objType, name) on the module, not the model.
-    // Body type is mjOBJ_BODY = 1.
-    try {
-      const MJ_OBJ_BODY = 1;
-      const boxBodyId = mujoco.mj_name2id(this.model, MJ_OBJ_BODY, "free_box");
-      if (boxBodyId >= 0) {
-        const jntAdr = this.model.body_jntadr[boxBodyId];
-        if (jntAdr >= 0) {
-          this.boxQposAdr = this.model.jnt_qposadr[jntAdr];
-          console.log("[scene] free_box qpos addr =", this.boxQposAdr);
-        }
-      }
-    } catch (err) {
-      console.warn("[scene] could not resolve free_box qpos addr:", err);
-    }
+    this._resolveBoxQposAdr();
 
     if (this.runMode === "spawn") {
       // Wait for the user to click Start. captureStartClick() at module-load
@@ -556,7 +568,7 @@ export class MuJoCoDemo {
       assets.contactLabels,
       {
         fps: assets.policyMeta.control_dt > 0 ? 1.0 / assets.policyMeta.control_dt : 50.0,
-        contactDim: assets.policyMeta.contact_dim,
+        streamContactDim: assets.contactLabels.maxStreamDim(),
         defaultContactLabel: assets.policyMeta.default_contact_label,
         contactLabelsMnOnly: true,
         pickupForwardStepScale: 0.5, // matches --slow-pickup-2x default
@@ -582,28 +594,11 @@ export class MuJoCoDemo {
     this._kd = Float32Array.from(assets.policyMeta.joint_damping);
     this._torqueLimit = Float32Array.from(assets.policyMeta.torque_limit);
     this._yawRateRadPerS = (60 * Math.PI) / 180; // mirrors --yaw-adjust-deg-per-s default
+    this._initQpos36 = Array.isArray(assets.policyMeta.init_qpos_36)
+      ? assets.policyMeta.init_qpos_36
+      : null;
 
-    // Initialize sim qpos[0:36] from policyMeta.init_qpos_36 (frame 0 of the ref
-    // motion, baked offline by build_browser_assets.py to match Python's
-    // mujoco_env.py:213-219). This puts the robot at the same world location and
-    // joint configuration the Python controller starts with — necessary for
-    // end-to-end physics parity with the WS-bridge backend.
-    if (Array.isArray(assets.policyMeta.init_qpos_36) &&
-        assets.policyMeta.init_qpos_36.length === 36) {
-      const q0 = assets.policyMeta.init_qpos_36;
-      for (let i = 0; i < 36 && i < this.data.qpos.length; i++) this.data.qpos[i] = q0[i];
-      mujoco.mj_forward(this.model, this.data);
-    } else {
-      // Fallback: fall back to MotionGraphRuntime's stop frame. Less accurate but
-      // keeps the demo runnable when init_qpos_36 isn't baked into policy_meta.
-      console.warn("[scene] policy_meta.init_qpos_36 missing; falling back to motion graph Stop pose");
-      const init = this.motionGraph.step("Stop", null, 0);
-      const q0 = qposFromRuntimePose(
-        init.joint_pos_isaac, init.root_pos_w, init.root_quat_wxyz, this.policy.ISAAC_TO_MUJOCO,
-      );
-      for (let i = 0; i < 36 && i < this.data.qpos.length; i++) this.data.qpos[i] = q0[i];
-      mujoco.mj_forward(this.model, this.data);
-    }
+    this._applyFullBrowserInitialPose();
 
     this._policyAccumMs = 0;
     this._lastTickerMs = -1;
@@ -622,6 +617,15 @@ export class MuJoCoDemo {
       mjStepIdx: 0,
     };
     this._perfDom = this._installPerfOverlay();
+    if ((import.meta.env.VITE_GUI_MODE || "open") === "hide") {
+      this._installKeyboardHintInSpeedPanel();
+    }
+    this._setupReferenceGhost();
+    this._seedReferencePoseFromSim();
+    if (this.refMotionButton) {
+      this.refMotionButton.style.display = "";
+      this.refMotionButton.style.opacity = this.params.showReferenceMotion ? "1" : "0.45";
+    }
     console.log("[scenebot] full-browser runtime initialized");
 
     // Drive the sim with a setTimeout loop so cadence is independent of rAF
@@ -630,25 +634,171 @@ export class MuJoCoDemo {
     this._startSimLoop();
   }
 
+  _applyFullBrowserInitialPose() {
+    if (!this.model || !this.data) return;
+    this.mujoco.mj_resetData(this.model, this.data);
+    // Initialize sim qpos[0:36] from policyMeta.init_qpos_36 (frame 0 of the ref
+    // motion, baked offline by build_browser_assets.py to match Python's
+    // mujoco_env.py:213-219). This puts the robot at the same world location and
+    // joint configuration the Python controller starts with — necessary for
+    // end-to-end physics parity with the WS-bridge backend.
+    if (this._initQpos36 && this._initQpos36.length === 36) {
+      const q0 = this._initQpos36;
+      for (let i = 0; i < 36 && i < this.data.qpos.length; i++) this.data.qpos[i] = q0[i];
+      this.mujoco.mj_forward(this.model, this.data);
+    } else if (this.motionGraph && this.policy) {
+      // Fallback: fall back to MotionGraphRuntime's stop frame. Less accurate but
+      // keeps the demo runnable when init_qpos_36 isn't baked into policy_meta.
+      console.warn("[scene] policy_meta.init_qpos_36 missing; falling back to motion graph Stop pose");
+      const init = this.motionGraph.step("Stop", null, 0);
+      const q0 = qposFromRuntimePose(
+        init.joint_pos_isaac, init.root_pos_w, init.root_quat_wxyz, this.policy.ISAAC_TO_MUJOCO,
+      );
+      for (let i = 0; i < 36 && i < this.data.qpos.length; i++) this.data.qpos[i] = q0[i];
+      this.mujoco.mj_forward(this.model, this.data);
+    }
+  }
+
+  async onSceneReloaded() {
+    if (this.runMode !== "browser") return;
+    this.model.opt.timestep = this._simDt;
+    this._resolveBoxQposAdr();
+    if (this.motionGraph) this.motionGraph.reset();
+    this._applyFullBrowserInitialPose();
+    if (this.kb) this.kb.reset();
+    if (this.policy) this.policy.reset();
+    this._policyAccumMs = 0;
+    this._lastTickerMs = -1;
+    this.bindTrackingTargets();
+    this._setupReferenceGhost();
+    this._seedReferencePoseFromSim();
+  }
+
+  _disposeReferenceGhost() {
+    disposeReferenceGhost(this.refViz);
+    this.refViz = null;
+    this._latestRefQpos = null;
+  }
+
+  _setupReferenceGhost() {
+    if (this.runMode !== "browser" || !this.model || !this.bodies) return;
+    this._disposeReferenceGhost();
+    this.refViz = createReferenceGhost({
+      scene: this.scene,
+      mujoco: this.mujoco,
+      model: this.model,
+      bodies: this.bodies,
+    });
+    setReferenceGhostVisible(this.refViz, this.params.showReferenceMotion !== false);
+  }
+
+  _seedReferencePoseFromSim() {
+    if (!this.data?.qpos || !this.policy) return;
+    this._latestRefQpos = new Float64Array(36);
+    for (let i = 0; i < 36; i++) this._latestRefQpos[i] = this.data.qpos[i];
+  }
+
+  _updateLatestRefQpos(packet) {
+    if (!packet || !this.policy || !this.kb) return;
+    const jpRef = this.kb.blendJointPoseUpperFrozen(packet.joint_pos_isaac);
+    this._latestRefQpos = qposFromRuntimePose(
+      jpRef,
+      packet.root_pos_w,
+      packet.root_quat_wxyz,
+      this.policy.ISAAC_TO_MUJOCO,
+    );
+  }
+
+  _syncReferenceMotion() {
+    if (!this.params.showReferenceMotion || !this.refViz || !this._latestRefQpos) return;
+    const rootZ = this.data?.qpos?.length > 2 ? this.data.qpos[2] : undefined;
+    syncReferenceGhost(this.mujoco, this.model, this.refViz, this._latestRefQpos, { rootZ });
+  }
+
+  _resolveBoxQposAdr() {
+    this.boxQposAdr = -1;
+    try {
+      const MJ_OBJ_BODY = 1;
+      const boxBodyId = mujoco.mj_name2id(this.model, MJ_OBJ_BODY, "free_box");
+      if (boxBodyId >= 0) {
+        const jntAdr = this.model.body_jntadr[boxBodyId];
+        if (jntAdr >= 0) {
+          this.boxQposAdr = this.model.jnt_qposadr[jntAdr];
+        }
+      }
+    } catch (err) {
+      console.warn("[scene] could not resolve free_box qpos addr:", err);
+    }
+  }
+
   _installPerfOverlay() {
+    const wrap = document.createElement("div");
+    wrap.id = "scenebot-perf-wrap";
+    wrap.style.cssText = [
+      "position:absolute",
+      "top:108px",
+      "left:16px",
+      "z-index:1300",
+      "display:flex",
+      "flex-direction:column",
+      "gap:8px",
+      "pointer-events:none",
+      `min-width:${SCENEBOT_PANEL_MIN_WIDTH}`,
+      "width:max-content",
+    ].join(";");
+
     const root = document.createElement("div");
     root.id = "scenebot-perf";
     root.style.cssText = [
-      "position:absolute",
-      "top:60px",
-      "left:16px",
-      "z-index:1300",
       "padding:10px 14px",
       "background:rgba(0,0,0,0.65)",
       "color:#cfe9ff",
       "font:12px/1.4 ui-monospace,Menlo,Consolas,monospace",
       "border-radius:8px",
       "white-space:pre",
-      "pointer-events:none",
+      `min-width:${SCENEBOT_PANEL_MIN_WIDTH}`,
+      "box-sizing:border-box",
     ].join(";");
     root.textContent = "perf: warming up…";
-    (this.container || document.body).appendChild(root);
+
+    wrap.appendChild(root);
+    (this.container || document.body).appendChild(wrap);
     return root;
+  }
+
+  _installKeyboardHintInSpeedPanel() {
+    if (this._keyboardHintDom || !this.speedControlsContainer) return;
+
+    const topRow = document.createElement("div");
+    topRow.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+    while (this.speedControlsContainer.firstChild) {
+      topRow.appendChild(this.speedControlsContainer.firstChild);
+    }
+
+    const hint = document.createElement("div");
+    hint.id = "scenebot-controls-hint-speed";
+    hint.style.cssText = [
+      "padding:6px 10px",
+      "border-radius:8px",
+      "background:rgba(0,0,0,0.55)",
+      "color:#dfefff",
+      "font:11px/1.35 Arial,sans-serif",
+      `min-width:${SCENEBOT_PANEL_MIN_WIDTH}`,
+      "width:max-content",
+      "max-width:min(520px, calc(100vw - 32px))",
+      "white-space:pre-wrap",
+      "box-sizing:border-box",
+    ].join(";");
+    hint.textContent = formatControlsHintPanel();
+
+    const guiMode = import.meta.env.VITE_GUI_MODE || "open";
+    this.speedControlsContainer.style.flexDirection = "column";
+    this.speedControlsContainer.style.alignItems = guiMode === "hide" ? "flex-end" : "flex-start";
+    this.speedControlsContainer.style.minWidth = SCENEBOT_PANEL_MIN_WIDTH;
+    this.speedControlsContainer.style.maxWidth = "min(520px, calc(100vw - 32px))";
+    this.speedControlsContainer.appendChild(topRow);
+    this.speedControlsContainer.appendChild(hint);
+    this._keyboardHintDom = hint;
   }
 
   _updatePerfOverlay() {
@@ -890,6 +1040,14 @@ export class MuJoCoDemo {
     // 2) Step motion graph → stream packet (lower_cmd / vr_* / contact_mask / motion_anchor_*).
     const packet = this.motionGraph.step(latchedCommand, ctrlSkipCmd, dyaw);
 
+    // Auto-freeze upper body when forward pick-up (G) finishes — snapshot the final pose.
+    if (packet.pickup_forward_completed && !this.kb.upperBodyFreezeEnabled()) {
+      this.kb.activateUpperBodyFreeze();
+      this.kb.setUpperBodyFreezeSnapshot(
+        packet.joint_pos_isaac, packet.contact_mask, packet.vr_3point_pos_l, packet.vr_3point_orn_l,
+      );
+    }
+
     // 3) Optional upper-body freeze (F): take snapshot when freeze toggles enabled.
     const freezeEv = this.kb.pollUpperBodyFreezeToggle();
     if (freezeEv === "enabled") {
@@ -900,6 +1058,7 @@ export class MuJoCoDemo {
       this.kb.clearUpperBodyFreezeSnapshot();
     }
     this.kb.applyFrozenUpperToStreamPacket(packet);
+    this._updateLatestRefQpos(packet);
 
     // 4) Feed packet into the policy's "latest streaming inputs".
     this.policy.ingestStreamPacket(packet);
@@ -1046,6 +1205,7 @@ export class MuJoCoDemo {
     // tab, headless Chromium, occluded window, etc.).
     if (this.runMode === "browser" && this.motionGraph && this.policy) {
       this._syncBodyTransformsFromMujoco();
+      this._syncReferenceMotion();
       this.renderer.render(this.scene, this.camera);
       return;
     }
