@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="description" content="Interactive MuJoCo Demo">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Interactive Demo | Perceptive Humanoid Parkour</title>
+  <title>Interactive Demo | Scenebot</title>
 
   <link rel="stylesheet" href="./static/css/bulma.min.css">
   <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
@@ -21,9 +21,7 @@
   <script>
     (function () {
       const isMobile = window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 900;
-      if (isMobile && !window.location.pathname.endsWith("/demo-mobile.html")) {
-        window.location.replace("./demo-mobile.html");
-      }
+      document.documentElement.classList.toggle("is-mobile-viewport", isMobile);
     })();
   </script>
   <style>
@@ -41,50 +39,105 @@
       background: rgba(255, 255, 255, 0.9);
       border: 1px solid rgba(255, 255, 255, 0.5);
     }
+    .demo-kbd {
+      background: #f0f0f0;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    .demo-tip-banner .demo-kbd {
+      background: #fff9e6;
+      border: 1px solid #e6c84c;
+    }
+    .demo-desktop-only {
+      display: none;
+    }
+    .demo-mobile-only {
+      display: none;
+    }
+    html.is-mobile-viewport .demo-desktop-only {
+      display: none !important;
+    }
+    html.is-mobile-viewport .demo-mobile-only {
+      display: flex !important;
+    }
+    html:not(.is-mobile-viewport) .demo-desktop-only {
+      display: block;
+    }
+    html:not(.is-mobile-viewport) .demo-mobile-only {
+      display: none !important;
+    }
+    .demo-mobile-notice {
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 2rem;
+      text-align: center;
+      color: #e2e8f0;
+      background: #0f172a;
+    }
   </style>
 </head>
 
 <body>
-  <section class="section interactive-demo-section" style="background-color: #0f172a; min-height: 100vh; padding: 0;">
+  <section class="demo-mobile-only demo-mobile-notice">
+    <div class="demo-glass" style="max-width: 520px; padding: 1.5rem 1.75rem; border-radius: 14px;">
+      <p style="font-size: 1.2rem; line-height: 1.6; color: #0f172a; margin: 0;">
+        For interactive demo please use laptop/desktop.
+      </p>
+    </div>
+    <a class="button is-light is-rounded" href="./index-mobile.html" style="margin-top: 1.5rem;">← Back to main page</a>
+  </section>
+
+  <section class="section interactive-demo-section demo-desktop-only" style="background-color: #0f172a; min-height: 100vh; padding: 0;">
     <div class="demo-display-container" style="height: 100vh; width: 100vw; position: relative; overflow: hidden;">
       <iframe
         id="demoFrame"
         src="./mujoco_wasm/dist-desktop/index.html"
         loading="lazy"
         style="width: 100%; height: 100%; border: none;"
-        title="PHP MuJoCo Web Demo">
+        title="Scenebot MuJoCo Web Demo">
         Your browser does not support iframes.
       </iframe>
 
-      <div style="position: absolute; left: 50%; top: 6px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; width: calc(100% - 32px); max-width: 1200px;">
-        <div class="demo-glass" style="flex: 1 1 auto; min-width: 0; padding: 0.8rem 1.2rem; border-radius: 999px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22); background: rgba(255, 243, 205, 0.96); border: 1px solid #e6c84c;">
-          <div style="font-size: 1.5rem; line-height: 1.5; color: #0f172a; text-align: center; white-space: normal;">
-            💡 <strong>Keep holding <kbd style="background: #fff9e6; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: bold; border: 1px solid #e6c84c;">W</kbd> during approach, climbing, on top, and descent, until you’re back on the ground!</strong>        </div>
+      <div style="position: absolute; left: 50%; top: 6px; transform: translateX(-50%); display: flex; align-items: flex-start; gap: 12px; width: calc(100% - 32px); max-width: 1200px;">
+        <div class="demo-glass demo-tip-banner" style="flex: 1 1 auto; min-width: 0; padding: 0.75rem 1.1rem; border-radius: 14px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22); background: rgba(255, 243, 205, 0.96); border: 1px solid #e6c84c;">
+          <div style="font-size: 1.05rem; line-height: 1.45; color: #0f172a; text-align: center;">
+            💡 <strong>Press the next key when the previous motion is finished.</strong>
+            <div style="margin-top: 0.35rem; font-size: 0.98rem;">
+              Example sequence:
+              <kbd class="demo-kbd">Q</kbd>-<kbd class="demo-kbd">L</kbd>-<kbd class="demo-kbd">L</kbd>-<kbd class="demo-kbd">E</kbd>-<kbd class="demo-kbd">W</kbd>-<kbd class="demo-kbd">N</kbd>-<kbd class="demo-kbd">G</kbd>-<kbd class="demo-kbd">W</kbd>-<kbd class="demo-kbd">Z</kbd>-<kbd class="demo-kbd">P</kbd>
+            </div>
+          </div>
         </div>
-        <button type="button" class="demo-glass" style="border-radius: 999px; padding: 0.95rem 1.6rem; font-size: 1.35rem; font-weight: 700; color: #0f172a; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22); border: 1px solid rgba(255, 255, 255, 0.5); cursor: pointer;" onclick="triggerDemoReload();">
+        <button type="button" class="demo-glass" style="flex-shrink: 0; border-radius: 999px; padding: 0.95rem 1.6rem; font-size: 1.35rem; font-weight: 700; color: #0f172a; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22); border: 1px solid rgba(255, 255, 255, 0.5); cursor: pointer;" onclick="triggerDemoReload();">
           Reset
         </button>
       </div>
 
-      <div class="demo-glass" style="position: absolute; right: 16px; bottom: 16px; padding: 1rem 1.25rem; border-radius: 14px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2); max-width: 450px;">
+      <div class="demo-glass" style="position: absolute; right: 16px; bottom: 16px; padding: 1rem 1.25rem; border-radius: 14px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2); max-width: 520px;">
         <h3 class="title is-5" style="margin-bottom: 0.6rem; color: #333;">🎮 How to Play</h3>
-        <div style="font-size: 1.2rem; line-height: 1.5; color: #444;">
+        <div style="font-size: 1.05rem; line-height: 1.5; color: #444;">
           <div style="font-weight: 700; margin-bottom: 0.5rem;">Controls</div>
           <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.45rem 0.8rem; align-items: center;">
-            <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">W</kbd>
-            <span>Move forward</span>
-            <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">A</kbd>
-            <span>Turn left</span>
-            <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">D</kbd>
-            <span>Turn right</span>
-            <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">Climb</kbd>
-            <span>Autonomous when pressing <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">W</kbd></span>
-            <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">Y</kbd>
-            <span>Toggle speed mode</span>
-            <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">SPACE</kbd>
-            <span>Pause</span>
-            <kbd style="background: #f0f0f0; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: bold; justify-self: start;">BACKSPACE</kbd>
-            <span>Reset run</span>
+            <kbd class="demo-kbd" style="justify-self: start;">W A S D</kbd>
+            <span>Walk forward / back, turn left / right</span>
+            <kbd class="demo-kbd" style="justify-self: start;">Q / E</kbd>
+            <span>Spin in place left / right</span>
+            <kbd class="demo-kbd" style="justify-self: start;">N / Z</kbd>
+            <span>Step on box / come down</span>
+            <kbd class="demo-kbd" style="justify-self: start;">G / P</kbd>
+            <span>Pick up / put down box</span>
+            <kbd class="demo-kbd" style="justify-self: start;">L</kbd>
+            <span>Sit down / stand up (toggle)</span>
+            <kbd class="demo-kbd" style="justify-self: start;">F</kbd>
+            <span>Freeze / unfreeze upper body</span>
+            <kbd class="demo-kbd" style="justify-self: start;">Space</kbd>
+            <span>Hard stop</span>
+            <kbd class="demo-kbd" style="justify-self: start;">Backspace</kbd>
+            <span>Reset scene</span>
           </div>
         </div>
       </div>
@@ -102,6 +155,11 @@
       const frameDoc = frame.contentDocument || frame.contentWindow.document;
       if (frameDoc) {
         const buttons = Array.from(frameDoc.querySelectorAll('button'));
+        const resetButton = buttons.find((btn) => btn.textContent && btn.textContent.trim() === 'Reset');
+        if (resetButton) {
+          resetButton.click();
+          return;
+        }
         const reloadButton = buttons.find((btn) => btn.textContent && btn.textContent.trim() === 'Reload');
         if (reloadButton) {
           reloadButton.click();
@@ -109,16 +167,14 @@
         }
       }
       const down = new KeyboardEvent('keydown', {
-        key: 'l',
-        code: 'KeyL',
-        ctrlKey: true,
+        key: 'Backspace',
+        code: 'Backspace',
         bubbles: true,
         cancelable: true
       });
       const up = new KeyboardEvent('keyup', {
-        key: 'l',
-        code: 'KeyL',
-        ctrlKey: true,
+        key: 'Backspace',
+        code: 'Backspace',
         bubbles: true,
         cancelable: true
       });
