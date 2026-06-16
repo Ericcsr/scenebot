@@ -1,5 +1,28 @@
 window.HELP_IMPROVE_VIDEOJS = false;
 
+function enforceVideoMuted(video) {
+  if (!video || video.tagName !== 'VIDEO') {
+    return;
+  }
+  video.muted = true;
+  video.defaultMuted = true;
+  video.volume = 0;
+  if (video.dataset.muteLocked === '1') {
+    return;
+  }
+  video.dataset.muteLocked = '1';
+  video.addEventListener('volumechange', () => {
+    if (!video.muted || video.volume !== 0) {
+      video.muted = true;
+      video.volume = 0;
+    }
+  });
+}
+
+function enforceAllVideosMuted(root) {
+  (root || document).querySelectorAll('video').forEach(enforceVideoMuted);
+}
+
 var INTERP_BASE = "https://storage.googleapis.com/nerfies-public/interpolation/stacked";
 var NUM_INTERP_FRAMES = 240;
 
@@ -21,6 +44,8 @@ function setInterpolationImage(i) {
 
 
 $(document).ready(function() {
+    enforceAllVideosMuted();
+
     // Remove interactive demo section on mobile devices to prevent loading
     if (window.innerWidth <= 768) {
         $('.interactive-demo-section').remove();
@@ -45,6 +70,8 @@ $(document).ready(function() {
         console.log('Video autoplay and loop removed on mobile device (except flagship, roll, and box_1)');
         console.log('Lazy loading added to all videos on mobile device');
     }
+
+    enforceAllVideosMuted();
 
     // Check for click events on the navbar burger icon
     $(".navbar-burger").click(function() {
