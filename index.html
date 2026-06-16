@@ -125,13 +125,13 @@
             <div class="is-size-6" style="margin-top: 0.5rem; font-style: italic;">
               <sup>*</sup> Equal contribution. <sup>†</sup> Amazon FAR team co-lead.
             </div>
-            <h3 class="title is-4 conference-authors" style="margin-top: 1.5rem;"><span style="color: firebrick;">RSS 2026</span></a></h3>
+            <!-- <h3 class="title is-4 conference-authors" style="margin-top: 1.5rem;"><span style="color: firebrick;">RSS 2026</span></a></h3> -->
 
             <div class="column has-text-centered">
               <div class="publication-links">
                 <!-- Arxiv Link. -->
                 <span class="link-block">
-                  <a target="_blank" href="https://arxiv.org/abs/2602.15827"
+                  <a target="_blank" href="./static/images/paper.pdf"
                      class="external-link button is-normal is-rounded is-dark">
                     <span class="icon">
                         <i class="ai ai-arxiv"></i>
@@ -150,14 +150,14 @@
                     </a>
                 </span>
 
-              <!-- Video Link. -->
+              <!-- Data Link. -->
               <span class="link-block">
-                <a target="_blank" href="https://youtu.be/IjeBnbm9sto"
+                <a target="_blank" href=""
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
-                      <i class="fab fa-youtube"></i>
+                      <i class="fab fa-database"></i>
                   </span>
-                  <span>Video</span>
+                  <span>Data (Coming Soon)</span>
                 </a>
               </span>
 
@@ -184,7 +184,8 @@
                     </span>
                   </summary>
                   <div style="position: absolute; right: 0; margin-top: 1.0rem; padding: 0.4rem 0.6rem; background: #ffffff; border-radius: 10px; border: 1px solid #e5e7eb; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12); text-align: left; min-width: 200px; z-index: 20;">
-                    <a href="https://omniretarget.github.io/" style="display: block; color: #4a4a4a; font-weight: 600; padding: 0.35rem 0.25rem;">OmniRetarget</a>
+                    <a href="https://nvlabs.github.io/CHIP/" style="display: block; color: #4a4a4a; font-weight: 600; padding: 0.35rem 0.25rem;">CHIP</a>
+                    <a href="https://superodometry.com/" style="display: block; color: #4a4a4a; font-weight: 600; padding: 0.35rem 0.25rem;">SuperOdometry</a>
                   </div>
                 </details>
               </span>
@@ -489,12 +490,12 @@
         <h2 class="title is-2" style="text-align: center;">Abstract</h2>
         <div class="content has-text-justified">
           <p class="abstract-text" style="font-size: 0.95rem; line-height: 1.5;">
-            While recent advances in humanoid locomotion have achieved stable walking on varied terrains, capturing the agility and adaptivity of highly dynamic human motions remains an open challenge. In particular, agile parkour in complex environments demands not only low-level robustness, but also human-like motion expressiveness, long-horizon skill composition, and perception-driven decision-making. In this paper, we present Perceptive Humanoid Parkour (PHP), a modular framework that enables humanoid robots to autonomously perform long-horizon, vision-based parkour across challenging obstacle courses. Our approach first leverages motion matching, formulated as nearest-neighbor search in a feature space, to compose retargeted atomic human skills into long-horizon kinematic trajectories. This framework enables the flexible composition and smooth transition of complex skill chains while preserving the elegance and fluidity of dynamic human motions. Next, we train motion-tracking reinforcement learning (RL) expert policies for these composed motions, and distill them into a single depth-based, multi-skill student policy, using a combination of DAgger and RL. Crucially, the combination of perception and skill composition enables autonomous, context-aware decision-making: using only onboard depth sensing and a discrete 2D velocity command, the robot selects and executes whether to step over, climb onto, vault or roll off obstacles of varying geometries and heights. We validate our framework with extensive real-world experiments on a Unitree G1 humanoid robot, demonstrating highly dynamic parkour skills such as climbing tall obstacles up to 1.25m (96% robot height), as well as long-horizon multi-obstacle traversal with closed-loop adaptation to real-time obstacle perturbations.
+            Current humanoid reinforcement-learning policies excel at free-space motions but struggle with contact-rich tasks, as pure kinematic tracking cannot resolve the physical ambiguities of interacting with objects and uneven terrain. To address this, we introduce SceneBot, a unified motion-tracking framework capable of handling freespace locomotion, terrain traversal, and whole-body manipulation. SceneBot conditions a single policy on both reference motions and per-link contact labels, explicitly defining expected environmental interactions. To overcome the lack of annotated interaction data, we propose a hindsight scene reconstruction approach that infers scene-interaction graphs from retargeted human motion. Trained on 7.5 hours of this reconstructed, contact-rich data, SceneBot successfully generalizes to unseen motions and environments. Our results demonstrate that SceneBot is the first general framework to seamlessly unify free-space and contact-rich behaviors—executing complex, long-horizon tasks like carrying a box upstairs and establishing contact conditioning as a powerful interface for humanoid control.
            
           </p>
         </div>
         <div style="text-align: center;">
-          <img src="./static/images/fig2_method.png" class="interpolation-image" style="width: 75%; height: auto;"/>
+          <img src="./static/images/method_v6.png" class="interpolation-image" style="width: 75%; height: auto;"/>
         </div>
   </div>
 </section>
@@ -502,7 +503,7 @@
 <footer class="footer">
   <div class="container">
     <div class="content has-text-centered">
-      <p>Page template borrowed from <a href="https://nerfies.github.io/"><span class="dnerf">Nerfies</span></a>, <a href="https://omniretarget.github.io/">OmniRetarget</a>, <a href="https://beyondmimic.github.io/">BeyondMimic</a>.</p>
+      <p>Page template borrowed from <a href="https://nerfies.github.io/"><span class="dnerf">Nerfies</span></a>, <a href="https://php-parkour.github.io/">PHP</a>, <a href="https://omniretarget.github.io/">OmniRetarget</a>, <a href="https://beyondmimic.github.io/">BeyondMimic</a>.</p>
     </div>
   </div>
 </footer>
