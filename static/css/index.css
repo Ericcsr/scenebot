@@ -211,6 +211,14 @@ body {
   margin: 2rem 0;
 }
 
+/* Center a lone last item when a 3-video row wraps in a 2-column grid. */
+.simulation-grid.simulation-grid-center-last > .simulation-item:last-child:nth-child(3) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: calc((100% - 1.5rem) / 2);
+  max-width: calc((100% - 1.5rem) / 2);
+}
+
 /* Desktop Grid - Show on desktop, hide on mobile */
 .desktop-grid {
   display: grid;
@@ -261,6 +269,13 @@ body {
   .simulation-grid {
     grid-template-columns: repeat(3, 1fr);
     gap: 1.25rem;
+  }
+
+  .simulation-grid.simulation-grid-center-last > .simulation-item:last-child:nth-child(3) {
+    grid-column: auto;
+    justify-self: stretch;
+    width: auto;
+    max-width: none;
   }
 }
 
