@@ -1464,6 +1464,14 @@ body {
   pointer-events: none;
 }
 
+.scenebot-demo-loading.is-error {
+  background: linear-gradient(160deg, #3b1212 0%, #4c1d1d 55%, #3b1212 100%);
+}
+
+.scenebot-demo-loading.is-error .scenebot-demo-loading__title {
+  color: #fecaca;
+}
+
 .scenebot-demo-loading__spinner {
   width: 52px;
   height: 52px;

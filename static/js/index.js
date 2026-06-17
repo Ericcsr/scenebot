@@ -26,6 +26,9 @@ function enforceAllVideosMuted(root) {
 function initScenebotDemoLoading() {
   const DEMO_READY = 'scenebot-demo-ready';
   const DEMO_PROGRESS = 'scenebot-demo-progress';
+  const DEMO_ERROR = 'scenebot-demo-error';
+  const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+  const STALE_BUNDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
   document.querySelectorAll('.scenebot-demo-shell').forEach((shell) => {
     const iframe = shell.querySelector('.scenebot-demo-frame');
@@ -34,11 +37,15 @@ function initScenebotDemoLoading() {
       return;
     }
 
+    const titleEl = loader.querySelector('.scenebot-demo-loading__title');
     const hintEl = loader.querySelector('.scenebot-demo-loading__hint');
+    const spinnerEl = loader.querySelector('.scenebot-demo-loading__spinner');
     let hideTimer = null;
-    let fallbackTimer = null;
+    let idleTimer = null;
+    let absoluteTimer = null;
     let hidden = false;
     let onMessage = null;
+    let waiting = false;
 
     const hideLoader = () => {
       if (hidden) {
@@ -57,26 +64,69 @@ function initScenebotDemoLoading() {
     const showLoader = () => {
       window.clearTimeout(hideTimer);
       hidden = false;
-      loader.classList.remove('is-hidden');
+      loader.classList.remove('is-hidden', 'is-error');
       loader.setAttribute('aria-busy', 'true');
+      if (spinnerEl) {
+        spinnerEl.style.display = '';
+      }
+      if (titleEl) {
+        titleEl.textContent = 'Loading interactive demo…';
+      }
       if (hintEl) {
-        hintEl.textContent = 'Streaming robot model, policy, and scene assets. This may take a few seconds.';
+        hintEl.textContent = 'Streaming robot model, policy, and scene assets. First visit may take a few minutes.';
       }
     };
 
+    const showError = (message) => {
+      stopWaiting();
+      if (spinnerEl) {
+        spinnerEl.style.display = 'none';
+      }
+      if (titleEl) {
+        titleEl.textContent = 'Demo failed to load';
+      }
+      if (hintEl) {
+        hintEl.textContent = message || 'Please refresh the page or try again on a desktop browser.';
+      }
+      loader.classList.remove('is-hidden');
+      loader.classList.add('is-error');
+      loader.setAttribute('aria-busy', 'false');
+    };
+
     const stopWaiting = () => {
+      waiting = false;
       if (onMessage) {
         window.removeEventListener('message', onMessage);
         onMessage = null;
       }
-      window.clearTimeout(fallbackTimer);
-      fallbackTimer = null;
+      window.clearTimeout(idleTimer);
+      idleTimer = null;
+      window.clearTimeout(absoluteTimer);
+      absoluteTimer = null;
+    };
+
+    const resetIdleTimeout = () => {
+      window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(() => {
+        showError('Loading stalled. Check your connection and refresh — the first visit downloads large assets.');
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    const isFromDemoIframe = (event) => {
+      try {
+        return iframe.contentWindow && event.source === iframe.contentWindow;
+      } catch (_) {
+        return false;
+      }
     };
 
     const waitForDemoReady = () => {
       stopWaiting();
+      waiting = true;
+      resetIdleTimeout();
+
       onMessage = (event) => {
-        if (event.source !== iframe.contentWindow) {
+        if (!isFromDemoIframe(event)) {
           return;
         }
         const data = event.data;
@@ -84,7 +134,12 @@ function initScenebotDemoLoading() {
           return;
         }
         if (data.type === DEMO_PROGRESS && hintEl && data.message) {
+          resetIdleTimeout();
           hintEl.textContent = String(data.message);
+          return;
+        }
+        if (data.type === DEMO_ERROR) {
+          showError(data.message ? String(data.message) : undefined);
           return;
         }
         if (data.type !== DEMO_READY) {
@@ -95,14 +150,17 @@ function initScenebotDemoLoading() {
       };
       window.addEventListener('message', onMessage);
 
-      // Fallback for stale bundles that do not post scenebot-demo-ready.
-      fallbackTimer = window.setTimeout(() => {
-        stopWaiting();
-        scheduleHideLoader();
-      }, 120000);
+      absoluteTimer = window.setTimeout(() => {
+        if (!hidden && !loader.classList.contains('is-error')) {
+          showError('The demo did not finish loading. Refresh the page — first load can take several minutes on slow networks.');
+        }
+      }, STALE_BUNDLE_TIMEOUT_MS);
     };
 
-    waitForDemoReady();
+    iframe.addEventListener('load', () => {
+      showLoader();
+      waitForDemoReady();
+    });
 
     let lastSrc = iframe.getAttribute('src');
     new MutationObserver(() => {
@@ -113,6 +171,10 @@ function initScenebotDemoLoading() {
         waitForDemoReady();
       }
     }).observe(iframe, { attributes: true, attributeFilter: ['src'] });
+
+    if (iframe.contentWindow && iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+      waitForDemoReady();
+    }
   });
 }
 
