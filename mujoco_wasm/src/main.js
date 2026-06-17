@@ -25,29 +25,8 @@ import {
 } from './scenebot/reference_motion_viz.js';
 import { formatControlsHintPanel, SCENEBOT_PANEL_MIN_WIDTH } from './scenebot/controls_hint.js';
 
-function notifyParentDemo(type, payload = {}) {
-  if (window.parent === window) {
-    return;
-  }
-  try {
-    window.parent.postMessage({ type, ...payload }, '*');
-  } catch (_) {
-    /* ignore */
-  }
-}
-
 // Load the MuJoCo Module
-notifyParentDemo("scenebot-demo-progress", { message: "Loading physics engine…" });
-let mujoco;
-try {
-  mujoco = await load_mujoco();
-} catch (err) {
-  console.error("[scenebot] wasm load failed:", err);
-  notifyParentDemo("scenebot-demo-error", {
-    message: err?.message ? String(err.message) : "Physics engine failed to load.",
-  });
-  throw err;
-}
+const mujoco = await load_mujoco();
 
 // Thin-browser web demo: server (run_controller.py + ws_bridge.py) is authoritative.
 // Browser loads the SAME merged scene XML the server sims, receives qpos over WS,
@@ -523,19 +502,10 @@ export class MuJoCoDemo {
     const stagePrefix = this.runMode === "browser"
       ? `${import.meta.env.BASE_URL}scenebot/`.replace(/\/+/g, "/")
       : "/";
-    if (this.runMode === "browser") {
-      notifyParentDemo("scenebot-demo-progress", { message: "Downloading robot meshes…" });
-    }
     await stageSceneIntoMemfs(initialScene, stagePrefix);
 
-    // Example scenes are only needed for the GUI scene switcher in dev/WS modes.
-    if (this.runMode !== "browser") {
-      await downloadExampleScenesFolder(mujoco);
-    }
-
-    if (this.runMode === "browser") {
-      notifyParentDemo("scenebot-demo-progress", { message: "Building 3D scene…" });
-    }
+    // Download the the examples to MuJoCo's virtual file system
+    await downloadExampleScenesFolder(mujoco);
 
     // Initialize the three.js Scene using the .xml Model in initialScene
     [this.model, this.data, this.bodies, this.lights] =
@@ -586,21 +556,11 @@ export class MuJoCoDemo {
 
     // Start the render loop only after the model and assets are ready
     this.renderer.setAnimationLoop( this.render.bind(this) );
-
-    if (this.runMode === "browser") {
-      const notifyReady = () => notifyParentDemo("scenebot-demo-ready");
-      requestAnimationFrame(() => requestAnimationFrame(notifyReady));
-    }
   }
 
   async _initFullBrowser() {
     // Load packaged scenebot assets (motion graph, clips, contact labels, policy meta).
-    const assets = await loadScenebotAssets({
-      onProgress: (m) => {
-        console.log("[load]", m);
-        notifyParentDemo("scenebot-demo-progress", { message: m });
-      },
-    });
+    const assets = await loadScenebotAssets({ onProgress: (m) => console.log("[load]", m) });
 
     this.motionGraph = new MotionGraphRuntime(
       assets.motionGraph,
@@ -1545,11 +1505,4 @@ export class MuJoCoDemo {
 
 let demo = new MuJoCoDemo();
 window.demo = demo; // exposed for headless verification + browser console debugging
-try {
-  await demo.init();
-} catch (err) {
-  console.error("[scenebot] init failed:", err);
-  notifyParentDemo("scenebot-demo-error", {
-    message: err?.message ? String(err.message) : "Simulation failed to start.",
-  });
-}
+await demo.init();
