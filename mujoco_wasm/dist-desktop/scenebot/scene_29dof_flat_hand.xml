@@ -19,7 +19,7 @@
   <worldbody>
     
     
-    <body name="free_box" pos="1.75 0.05 0.51" quat="1 0 0 0">
+    <body name="free_box" pos="1.75 0.1 0.51" quat="1 0 0 0">
       <freejoint name="free_box_joint"/>
       <geom name="free_box_geom" type="box" pos="0 0 0" size="0.15 0.1 0.15" mass="0.1" contype="1" conaffinity="1" rgba="0.65 0.45 0.35 1.0"/>
     </body>
