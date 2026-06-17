@@ -25,6 +25,17 @@ import {
 } from './scenebot/reference_motion_viz.js';
 import { formatControlsHintPanel, SCENEBOT_PANEL_MIN_WIDTH } from './scenebot/controls_hint.js';
 
+function notifyParentDemo(type, payload = {}) {
+  if (window.parent === window) {
+    return;
+  }
+  try {
+    window.parent.postMessage({ type, ...payload }, window.location.origin);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 // Load the MuJoCo Module
 const mujoco = await load_mujoco();
 
@@ -560,7 +571,12 @@ export class MuJoCoDemo {
 
   async _initFullBrowser() {
     // Load packaged scenebot assets (motion graph, clips, contact labels, policy meta).
-    const assets = await loadScenebotAssets({ onProgress: (m) => console.log("[load]", m) });
+    const assets = await loadScenebotAssets({
+      onProgress: (m) => {
+        console.log("[load]", m);
+        notifyParentDemo("scenebot-demo-progress", { message: m });
+      },
+    });
 
     this.motionGraph = new MotionGraphRuntime(
       assets.motionGraph,
@@ -632,6 +648,7 @@ export class MuJoCoDemo {
       this.refMotionButton.style.opacity = this.params.showReferenceMotion ? "1" : "0.45";
     }
     console.log("[scenebot] full-browser runtime initialized");
+    notifyParentDemo("scenebot-demo-ready");
 
     // Drive the sim with a setTimeout loop so cadence is independent of rAF
     // throttling (Chromium throttles rAF heavily when the page is occluded /

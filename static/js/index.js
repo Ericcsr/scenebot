@@ -24,6 +24,9 @@ function enforceAllVideosMuted(root) {
 }
 
 function initScenebotDemoLoading() {
+  const DEMO_READY = 'scenebot-demo-ready';
+  const DEMO_PROGRESS = 'scenebot-demo-progress';
+
   document.querySelectorAll('.scenebot-demo-shell').forEach((shell) => {
     const iframe = shell.querySelector('.scenebot-demo-frame');
     const loader = shell.querySelector('.scenebot-demo-loading');
@@ -31,8 +34,11 @@ function initScenebotDemoLoading() {
       return;
     }
 
+    const hintEl = loader.querySelector('.scenebot-demo-loading__hint');
     let hideTimer = null;
+    let fallbackTimer = null;
     let hidden = false;
+    let onMessage = null;
 
     const hideLoader = () => {
       if (hidden) {
@@ -45,7 +51,7 @@ function initScenebotDemoLoading() {
 
     const scheduleHideLoader = () => {
       window.clearTimeout(hideTimer);
-      hideTimer = window.setTimeout(hideLoader, 350);
+      hideTimer = window.setTimeout(hideLoader, 400);
     };
 
     const showLoader = () => {
@@ -53,17 +59,50 @@ function initScenebotDemoLoading() {
       hidden = false;
       loader.classList.remove('is-hidden');
       loader.setAttribute('aria-busy', 'true');
+      if (hintEl) {
+        hintEl.textContent = 'Streaming robot model, policy, and scene assets. This may take a few seconds.';
+      }
     };
 
-    iframe.addEventListener('load', scheduleHideLoader);
-
-    try {
-      if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-        scheduleHideLoader();
+    const stopWaiting = () => {
+      if (onMessage) {
+        window.removeEventListener('message', onMessage);
+        onMessage = null;
       }
-    } catch (_) {
-      /* same-origin only */
-    }
+      window.clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+    };
+
+    const waitForDemoReady = () => {
+      stopWaiting();
+      onMessage = (event) => {
+        if (event.source !== iframe.contentWindow) {
+          return;
+        }
+        const data = event.data;
+        if (!data || typeof data !== 'object') {
+          return;
+        }
+        if (data.type === DEMO_PROGRESS && hintEl && data.message) {
+          hintEl.textContent = String(data.message);
+          return;
+        }
+        if (data.type !== DEMO_READY) {
+          return;
+        }
+        stopWaiting();
+        scheduleHideLoader();
+      };
+      window.addEventListener('message', onMessage);
+
+      // Fallback for stale bundles that do not post scenebot-demo-ready.
+      fallbackTimer = window.setTimeout(() => {
+        stopWaiting();
+        scheduleHideLoader();
+      }, 120000);
+    };
+
+    waitForDemoReady();
 
     let lastSrc = iframe.getAttribute('src');
     new MutationObserver(() => {
@@ -71,6 +110,7 @@ function initScenebotDemoLoading() {
       if (src !== lastSrc) {
         lastSrc = src;
         showLoader();
+        waitForDemoReady();
       }
     }).observe(iframe, { attributes: true, attributeFilter: ['src'] });
   });
