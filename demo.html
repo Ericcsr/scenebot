@@ -102,6 +102,12 @@
         Your browser does not support iframes.
       </iframe>
 
+      <div class="demo-loading-overlay" id="demoLoadingOverlay">
+        <div class="demo-loading-spinner"></div>
+        <p class="demo-loading-title">Loading interactive demo…</p>
+        <p class="demo-loading-subtitle">Streaming the model, policy, and assets. This may take a few seconds.</p>
+      </div>
+
       <div style="position: absolute; left: 50%; top: 6px; transform: translateX(-50%); display: flex; align-items: flex-start; gap: 12px; width: calc(100% - 32px); max-width: 1200px;">
         <div class="demo-glass demo-tip-banner" style="flex: 1 1 auto; min-width: 0; padding: 0.75rem 1.1rem; border-radius: 14px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22); background: rgba(255, 243, 205, 0.96); border: 1px solid #e6c84c;">
           <div style="font-size: 1.05rem; line-height: 1.45; color: #0f172a; text-align: center;">
@@ -147,6 +153,41 @@
   </section>
 
   <script>
+    (function () {
+      var overlay = document.getElementById('demoLoadingOverlay');
+      var frame = document.getElementById('demoFrame');
+      if (!overlay || !frame) {
+        return;
+      }
+      var done = false;
+      function finish() {
+        if (done) {
+          return;
+        }
+        done = true;
+        overlay.classList.add('is-hidden');
+        setTimeout(function () { overlay.style.display = 'none'; }, 600);
+      }
+      function isReady() {
+        try {
+          var doc = frame.contentDocument;
+          if (!doc || doc.readyState !== 'complete') {
+            return false;
+          }
+          return !!doc.querySelector('canvas');
+        } catch (err) {
+          return true;
+        }
+      }
+      var poll = setInterval(function () {
+        if (isReady()) {
+          clearInterval(poll);
+          finish();
+        }
+      }, 200);
+      setTimeout(function () { clearInterval(poll); finish(); }, 20000);
+    })();
+
     function triggerDemoReload() {
       const frame = document.getElementById('demoFrame');
       if (!frame || !frame.contentWindow) {
