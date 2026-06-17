@@ -314,24 +314,16 @@
       overlay.classList.add('is-hidden');
       setTimeout(function () { overlay.style.display = 'none'; }, 600);
     }
-    function isReady() {
-      try {
-        var doc = frame.contentDocument;
-        if (!doc || doc.readyState !== 'complete') {
-          return false;
-        }
-        return !!doc.querySelector('canvas');
-      } catch (err) {
-        return true;
-      }
-    }
-    var poll = setInterval(function () {
-      if (isReady()) {
-        clearInterval(poll);
+    // Primary signal: the embedded sim posts this once it is actually live
+    // (first physics step rendered). See mujoco_wasm/src/main.js.
+    window.addEventListener('message', function (ev) {
+      if (ev && ev.data && ev.data.type === 'scenebot:ready') {
         finish();
       }
-    }, 200);
-    setTimeout(function () { clearInterval(poll); finish(); }, 20000);
+    });
+    // Fallback: clear after a generous timeout in case the message is missed
+    // (e.g. an older cached build that doesn't post it).
+    setTimeout(finish, 30000);
   })();
 </script>
 

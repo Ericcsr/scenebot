@@ -1173,6 +1173,9 @@ export class MuJoCoDemo {
           this._perf.stepIdx = (this._perf.stepIdx + 1) % this._perf.stepDurMs.length;
           this._perf.tickCount++;
         }
+        // First successful step means the sim is live and rendering — tell any
+        // embedding page (index.html / demo.html) to dismiss its loading overlay.
+        this._signalDemoReady();
       } catch (e) {
         console.error("[sim loop] step failed:", e);
       }
@@ -1193,6 +1196,20 @@ export class MuJoCoDemo {
 
   _stopSimLoop() {
     this._simLoopRunning = false;
+  }
+
+  /** Notify an embedding page (once) that the full-browser demo is live. */
+  _signalDemoReady() {
+    if (this._demoReadySignalled) return;
+    this._demoReadySignalled = true;
+    try {
+      window.dispatchEvent(new CustomEvent("scenebot:ready"));
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "scenebot:ready" }, "*");
+      }
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   async render(timeMS) {
