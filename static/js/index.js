@@ -23,6 +23,59 @@ function enforceAllVideosMuted(root) {
   (root || document).querySelectorAll('video').forEach(enforceVideoMuted);
 }
 
+function initScenebotDemoLoading() {
+  document.querySelectorAll('.scenebot-demo-shell').forEach((shell) => {
+    const iframe = shell.querySelector('.scenebot-demo-frame');
+    const loader = shell.querySelector('.scenebot-demo-loading');
+    if (!iframe || !loader) {
+      return;
+    }
+
+    let hideTimer = null;
+    let hidden = false;
+
+    const hideLoader = () => {
+      if (hidden) {
+        return;
+      }
+      hidden = true;
+      loader.classList.add('is-hidden');
+      loader.setAttribute('aria-busy', 'false');
+    };
+
+    const scheduleHideLoader = () => {
+      window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(hideLoader, 350);
+    };
+
+    const showLoader = () => {
+      window.clearTimeout(hideTimer);
+      hidden = false;
+      loader.classList.remove('is-hidden');
+      loader.setAttribute('aria-busy', 'true');
+    };
+
+    iframe.addEventListener('load', scheduleHideLoader);
+
+    try {
+      if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+        scheduleHideLoader();
+      }
+    } catch (_) {
+      /* same-origin only */
+    }
+
+    let lastSrc = iframe.getAttribute('src');
+    new MutationObserver(() => {
+      const src = iframe.getAttribute('src');
+      if (src !== lastSrc) {
+        lastSrc = src;
+        showLoader();
+      }
+    }).observe(iframe, { attributes: true, attributeFilter: ['src'] });
+  });
+}
+
 var INTERP_BASE = "https://storage.googleapis.com/nerfies-public/interpolation/stacked";
 var NUM_INTERP_FRAMES = 240;
 
@@ -72,6 +125,8 @@ $(document).ready(function() {
     }
 
     enforceAllVideosMuted();
+
+    initScenebotDemoLoading();
 
     // Check for click events on the navbar burger icon
     $(".navbar-burger").click(function() {
