@@ -23,26 +23,6 @@ function enforceAllVideosMuted(root) {
   (root || document).querySelectorAll('video').forEach(enforceVideoMuted);
 }
 
-var INTERP_BASE = "https://storage.googleapis.com/nerfies-public/interpolation/stacked";
-var NUM_INTERP_FRAMES = 240;
-
-var interp_images = [];
-function preloadInterpolationImages() {
-  for (var i = 0; i < NUM_INTERP_FRAMES; i++) {
-    var path = INTERP_BASE + '/' + String(i).padStart(6, '0') + '.jpg';
-    interp_images[i] = new Image();
-    interp_images[i].src = path;
-  }
-}
-
-function setInterpolationImage(i) {
-  var image = interp_images[i];
-  image.ondragstart = function() { return false; };
-  image.oncontextmenu = function() { return false; };
-  $('#interpolation-image-wrapper').empty().append(image);
-}
-
-
 $(document).ready(function() {
     enforceAllVideosMuted();
 
@@ -117,14 +97,6 @@ $(document).ready(function() {
         player.currentTime = player.duration / 100 * this.value;
       })
     }, false);*/
-    preloadInterpolationImages();
-
-    $('#interpolation-slider').on('input', function(event) {
-      setInterpolationImage(this.value);
-    });
-    setInterpolationImage(0);
-    $('#interpolation-slider').prop('max', NUM_INTERP_FRAMES - 1);
-
     bulmaSlider.attach();
 
     // Box Augmentation Demo functionality (only initialize if legacy demo elements exist)
