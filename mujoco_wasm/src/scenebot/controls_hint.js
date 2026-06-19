@@ -4,6 +4,7 @@
 export const SCENEBOT_PANEL_MIN_WIDTH = "420px";
 
 export const KEYBOARD_CONTROLS_HINT_ROWS = [
+  { keys: "Enter", action: "run example sequence" },
   { keys: "WASD", action: "walk / turn" },
   { keys: "Q / E", action: "spin left / right" },
   { keys: "N / Z", action: "step on box / down" },

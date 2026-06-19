@@ -24,6 +24,7 @@ import {
   syncReferenceGhost,
 } from './scenebot/reference_motion_viz.js';
 import { formatControlsHintPanel, SCENEBOT_PANEL_MIN_WIDTH } from './scenebot/controls_hint.js';
+import { ExampleSequenceRunner } from './scenebot/example_sequence_runner.js';
 
 // Load the MuJoCo Module
 const mujoco = await load_mujoco();
@@ -577,6 +578,8 @@ export class MuJoCoDemo {
 
     this.kb = new KeyboardCommandState();
     this.kb.attachDom();
+    this._exampleRunner = new ExampleSequenceRunner({ kb: this.kb, motionGraph: this.motionGraph });
+    this._exampleRunner.attach();
 
     this.policy = await PolicyRuntime.create(assets.policyOnnxUrl, assets.policyMeta);
 
@@ -668,6 +671,7 @@ export class MuJoCoDemo {
     if (this.runMode !== "browser") return;
     this.model.opt.timestep = this._simDt;
     this._resolveBoxQposAdr();
+    if (this._exampleRunner) this._exampleRunner.cancel();
     if (this.motionGraph) this.motionGraph.reset();
     this._applyFullBrowserInitialPose();
     if (this.kb) this.kb.reset();

@@ -203,6 +203,10 @@ export class KeyboardCommandState {
     }
   }
 
+  hasPendingYaw() {
+    return Math.abs(this._yaw_turn_remaining_rad) > 1e-6;
+  }
+
   // ────────────────────────────────────────────
   // Poll path (mirrors get_command / poll_*)
   // ────────────────────────────────────────────
