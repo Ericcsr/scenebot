@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>MuJoCo Demo</title>
+        <title>SceneBot Interactive Demo Viewer</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-        <meta name="application-name"   content="mujoco_wasm">
-        <meta name="description"        content="MuJoCo Testbed">
-        <meta name="keywords"           content="MuJoCo">
-        <meta name="author"             content="zalo">
+        <meta name="application-name"   content="SceneBot">
+        <meta name="description"        content="In-browser MuJoCo (WebAssembly) viewer for the SceneBot humanoid robotics research demo. This page is embedded inside the SceneBot project page.">
+        <meta name="keywords"           content="SceneBot, MuJoCo, humanoid robotics, research demo">
+        <!-- This is an embedded application shell, not a standalone page; keep it out of search results. -->
+        <meta name="robots"             content="noindex">
         <meta name="viewport"           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no, shrink-to-fit=0">
         <meta name="theme-color"        content="#ffffff">
         <link rel ="icon" type="image/x-icon" href="./assets/favicon.png">
+        <!-- Based on the open-source mujoco_wasm template by zalo (https://github.com/zalo/mujoco_wasm). -->
     </head>
 
     <body style="margin:0px; background-color:rgb(255, 255, 255); overflow:hidden; position:fixed; min-height: 100%;
@@ -20,7 +22,13 @@
                  -moz-user-select: none; /* Old versions of Firefox */
                  -ms-user-select: none; /* Internet Explorer/Edge */
                  user-select: none; /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */">
-        <h1 hidden></h1> <!-- Puts the Lighthouse Score over 90 heheh-->
+        <noscript>
+            <p style="font: 16px Arial; padding: 16px;">
+                This is the interactive WebAssembly demo viewer for
+                <a href="https://ericcsr.github.io/scenebot/">SceneBot</a>, an academic humanoid
+                robotics research project. JavaScript is required to run the simulation.
+            </p>
+        </noscript>
 
         <div id="appbody" style="position: absolute;">
             <!--<div id="error"></div>
